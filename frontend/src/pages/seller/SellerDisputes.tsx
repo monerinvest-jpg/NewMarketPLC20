@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Row, Col, Card, List, Typography, Button, Tag, message, Empty, Space, Popconfirm } from 'antd'
 import { disputesApi } from '@/api'
 import DisputeThread from '@/components/common/DisputeThread'
-import { disputeStatusMeta } from '@/pages/buyer/DisputesPage'
+import { disputeStatusMeta } from '@/lib/disputeMeta'
 import type { Dispute } from '@/types'
 import dayjs from 'dayjs'
 

@@ -5,17 +5,11 @@ import {
 import { PlusOutlined } from '@ant-design/icons'
 import { disputesApi, ordersApi } from '@/api'
 import DisputeThread from '@/components/common/DisputeThread'
-import type { Dispute, DisputeStatus } from '@/types'
+import { disputeStatusMeta } from '@/lib/disputeMeta'
+import type { Dispute } from '@/types'
 import dayjs from 'dayjs'
 
 const { Title, Text } = Typography
-
-export const disputeStatusMeta: Record<DisputeStatus, { color: string; label: string }> = {
-  open: { color: 'blue', label: 'Обсуждение' },
-  in_mediation: { color: 'gold', label: 'Арбитраж' },
-  resolved: { color: 'green', label: 'Решён' },
-  cancelled: { color: 'default', label: 'Отменён' },
-}
 
 export default function DisputesPage() {
   const [disputes, setDisputes] = useState<Dispute[]>([])
