@@ -1,0 +1,118 @@
+version: '3.9'
+
+services:
+  db:
+    image: mysql:8.0
+    container_name: marketplace_db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: ${MYSQL_DB:-marketplace}
+      MYSQL_USER: ${MYSQL_USER:-marketplace}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-marketplace_password}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-prootpassword"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - marketplace_net
+
+  redis:
+    image: redis:7-alpine
+    container_name: marketplace_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - marketplace_net
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: marketplace_backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    volumes:
+      - uploads_data:/app/uploads
+    command: >
+      sh -c "
+        alembic upgrade head &&
+        python scripts/seed.py &&
+        uvicorn app.main:app --host 0.0.0.0 --port 8000
+      "
+    networks:
+      - marketplace_net
+
+  celery_worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: marketplace_celery_worker
+    restart: unless-stopped
+    env_file:
+      - .env
+    depends_on:
+      - backend
+      - redis
+    volumes:
+      - uploads_data:/app/uploads
+    command: celery -A app.tasks.celery_app worker --loglevel=info
+    networks:
+      - marketplace_net
+
+  celery_beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: marketplace_celery_beat
+    restart: unless-stopped
+    env_file:
+      - .env
+    depends_on:
+      - backend
+      - redis
+    command: celery -A app.tasks.celery_app beat --loglevel=info
+    networks:
+      - marketplace_net
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
+    container_name: marketplace_frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "3000:3000"
+    networks:
+      - marketplace_net
+
+volumes:
+  mysql_data:
+  uploads_data:
+
+networks:
+  marketplace_net:
+    driver: bridge
