@@ -74,13 +74,13 @@ async def _auto_complete_orders_async():
 @celery_app.task(name="app.tasks.tasks.auto_mark_delivered")
 def auto_mark_delivered():
     """Mark shipped orders as delivered after configured number of days."""
-    return asyncio.get_event_loop().run_until_complete(_auto_mark_delivered_async())
+    return asyncio.run(_auto_mark_delivered_async())
 
 
 @celery_app.task(name="app.tasks.tasks.auto_complete_orders")
 def auto_complete_orders():
     """Auto-complete delivered orders after configured number of days."""
-    return asyncio.get_event_loop().run_until_complete(_auto_complete_orders_async())
+    return asyncio.run(_auto_complete_orders_async())
 
 
 # ─── Item 4: seller subscription auto-renewal ────────────────────────────────────
@@ -133,7 +133,12 @@ async def _process_subscription_renewals_async():
                     description=f"Автопродление «{plan.name}»", balance_after=owner.balance,
                 ))
                 sub.status = SubscriptionStatus.active
-                sub.current_period_end = now + timedelta(days=30)
+                # Anchor the next period to the end of the current one so the
+                # monthly billing date doesn't drift later each renewal; if the
+                # previous end is already in the past, restart from now.
+                base = sub.current_period_end or now
+                next_end = base + timedelta(days=30)
+                sub.current_period_end = next_end if next_end > now else now + timedelta(days=30)
             else:
                 # Can't renew: downgrade to default plan
                 default_plan = await get_default_plan(db)
@@ -147,7 +152,7 @@ async def _process_subscription_renewals_async():
 @celery_app.task(name="app.tasks.tasks.process_subscription_renewals")
 def process_subscription_renewals():
     """Charge or expire due seller subscriptions."""
-    return asyncio.get_event_loop().run_until_complete(_process_subscription_renewals_async())
+    return asyncio.run(_process_subscription_renewals_async())
 
 
 # ─── Item 7: product subscription notifications (back-in-stock / price-drop) ─────
@@ -185,7 +190,7 @@ async def _notify_product_subscriptions_async():
 @celery_app.task(name="app.tasks.tasks.notify_product_subscriptions")
 def notify_product_subscriptions():
     """Notify buyers about back-in-stock / price-drop events."""
-    return asyncio.get_event_loop().run_until_complete(_notify_product_subscriptions_async())
+    return asyncio.run(_notify_product_subscriptions_async())
 
 
 # ─── Item 7: abandoned cart reminders ────────────────────────────────────────────
@@ -196,12 +201,17 @@ async def _remind_abandoned_carts_async():
     from app.models.models import CartItem, NotificationType
     from app.services.notification_service import notify
 
-    cutoff = datetime.now(timezone.utc) - timedelta(days=1)
+    now = datetime.now(timezone.utc)
+    older_than = now - timedelta(days=1)
+    newer_than = now - timedelta(days=3)
     async with AsyncSessionLocal() as db:
-        # Users with cart items older than a day, grouped by user
+        # Users whose cart items have sat untouched for 1–3 days. The lower bound
+        # gives the buyer a day to come back on their own; the upper bound stops
+        # the daily beat from re-pinging the same stale cart forever (we have no
+        # per-cart "reminded" flag, so the window itself bounds the reminders).
         rows = (await db.execute(
             select(CartItem.user_id, func.count(CartItem.id))
-            .where(CartItem.created_at <= cutoff)
+            .where(CartItem.created_at <= older_than, CartItem.created_at >= newer_than)
             .group_by(CartItem.user_id)
         )).all()
         for user_id, count in rows:
@@ -217,7 +227,7 @@ async def _remind_abandoned_carts_async():
 @celery_app.task(name="app.tasks.tasks.remind_abandoned_carts")
 def remind_abandoned_carts():
     """Remind buyers about abandoned carts."""
-    return asyncio.get_event_loop().run_until_complete(_remind_abandoned_carts_async())
+    return asyncio.run(_remind_abandoned_carts_async())
 
 
 async def _rebuild_recommendations_async():
@@ -232,7 +242,7 @@ async def _rebuild_recommendations_async():
 @celery_app.task(name="app.tasks.tasks.rebuild_recommendations")
 def rebuild_recommendations():
     """Rebuild the materialized "bought together" co-purchase signal."""
-    return asyncio.get_event_loop().run_until_complete(_rebuild_recommendations_async())
+    return asyncio.run(_rebuild_recommendations_async())
 
 
 async def _settle_promotions_async():
@@ -247,7 +257,7 @@ async def _settle_promotions_async():
 @celery_app.task(name="app.tasks.tasks.settle_promotions")
 def settle_promotions():
     """Daily auction settlement: charge winners, demote outbid promotions."""
-    return asyncio.get_event_loop().run_until_complete(_settle_promotions_async())
+    return asyncio.run(_settle_promotions_async())
 
 
 async def _support_sla_sweep_async():
@@ -262,7 +272,7 @@ async def _support_sla_sweep_async():
 @celery_app.task(name="app.tasks.tasks.support_sla_sweep")
 def support_sla_sweep():
     """Escalate overdue support tickets and auto-assign unowned ones."""
-    return asyncio.get_event_loop().run_until_complete(_support_sla_sweep_async())
+    return asyncio.run(_support_sla_sweep_async())
 
 
 async def _loyalty_decay_async():
@@ -277,4 +287,4 @@ async def _loyalty_decay_async():
 @celery_app.task(name="app.tasks.tasks.loyalty_decay")
 def loyalty_decay():
     """Downgrade loyalty tiers for buyers inactive beyond their retention window."""
-    return asyncio.get_event_loop().run_until_complete(_loyalty_decay_async())
+    return asyncio.run(_loyalty_decay_async())

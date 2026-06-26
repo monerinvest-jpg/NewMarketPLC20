@@ -1,61 +1,65 @@
-# infra/ — готовые файлы для инфра-репозитория (Yandex Cloud)
+# infra/ — инфраструктура Yandex Cloud (Terraform + Ansible)
 
-Эти файлы предназначены для переноса в `skboyinboxru/Hand-Made` (`terraform/`, `Ansible/`).
-Сгенерированы под фактические идентификаторы вашего Terraform (`yandex_compute_instance_group.backend`,
-подсети `private`/`private_b`, SG `backend`, `data.yandex_compute_image.ubuntu`, переменные
-`var.project_name/folder_id/service_account_id/backend_*/disk_size/public_ssh_key_path/labels`).
+Самодостаточная инфраструктура для развёртывания маркетплейса в Yandex Cloud.
+Воссоздана из инфра-репозитория `skboyinboxru/Hand-Made` и интегрирована в этот
+проект (пути перенастроены под локальную раскладку). Полная пошаговая инструкция —
+в [../DEPLOY.md](../DEPLOY.md).
 
-> ⚠️ Перед `terraform apply` / прогоном плейбука — просмотрите и сверьте имена с вашим репозиторием.
-> Terraform не валидировался против полного стейта (нет доступа к вашему backend и стейту).
+## Структура
+
+```
+infra/
+├── terraform/                 # Создание ресурсов YC (Вариант A, рабочий по умолчанию)
+│   ├── providers.tf           #   провайдер yandex (ключ key.json), random, local
+│   ├── variables.tf           #   все переменные (обязательные: cloud_id/folder_id/service_account_id)
+│   ├── network.tf             #   VPC, подсети (a/b), NAT, security-группы kong/backend
+│   ├── database.tf            #   Managed PostgreSQL 17 (app + kong БД/юзеры) + Redis/Valkey
+│   ├── compute.tf             #   бастион, instance-группы kong и backend, cloud-init
+│   ├── loadbalancer.tf        #   внешний NLB :80 → Kong :8000
+│   ├── target_group.tf        #   target-группа Kong
+│   ├── outputs.tf             #   выводы + ГЕНЕРАЦИЯ hosts.ini (Ansible-инвентарь)
+│   ├── cloud-init.tpl         #   bootstrap узлов (docker, ssh-ключ)
+│   ├── ansible.cfg            #   inventory=./hosts.ini (Ansible запускается ОТСЮДА)
+│   ├── terraform.tfvars.example
+│   └── variant-b/             # ОПЦИЯ: по группе на сервис (для масштабирования)
+│
+└── ansible/
+    ├── deploy-services.yml    # Выкат: образы → migrate → 5 сервисов → worker/beat → Kong
+    ├── group_vars/all/
+    │   └── vault.yml.example  #   шаблон секретов (реальный — ansible-vault, опционально)
+    └── files/
+        └── README.md          #   сюда положить root.crt (CA Managed PostgreSQL)
+```
 
 ## Два варианта развёртывания
 
-### Вариант A (рекомендуется, drop-in) — мультиплекс на существующей backend-группе
-- **Terraform не меняется.** Все 5 сервисов + worker/beat запускаются контейнерами на узлах
-  текущей `yandex_compute_instance_group.backend`, порты 8001–8005.
-- Файл: **`ansible/deploy-services.yml`** — заменяет старый `deploy-backend.yml`.
-  Собирает контракт env, гоняет `migrate` (один раз), поднимает контейнеры, настраивает Kong-маршруты.
-- Таблица маршрутов и порты — в [STAGE2_INFRA_CHANGES.md](STAGE2_INFRA_CHANGES.md).
+- **Вариант A (по умолчанию):** базовый `terraform/` + `ansible/deploy-services.yml`.
+  Все 5 сервисов и worker/beat — контейнерами на существующей backend-группе
+  (порты 8001–8005). Kong — один маршрут на префикс пути. Ничего дополнительного
+  применять не нужно.
+- **Вариант B (масштабирование):** см. `terraform/variant-b/README.md` — отдельная
+  instance-группа на каждый сервис.
 
-### Вариант B (рост) — отдельная instance-группа на сервис
-- Файлы: **`terraform/compute_services.tf`**, **`terraform/variables_services.tf`**,
-  **`terraform/outputs_services.tf`** — кладутся рядом с вашими `*.tf`.
-- Создаёт `${project}-{identity,catalog,orders,sellers,platform}-ig` + per-service ALB target group
-  `${project}-<svc>-tg`. Контейнер слушает 8000 (по одному на узел группы).
-- При этом варианте: Ansible переводится на per-service inventory (по `docker run ... :latest web`
-  на 8000), а Kong `upstream` указывает на адрес/таргет-группу сервиса (см. `outputs_services.tf`).
+## Что отличается от исходного инфра-репозитория
 
-## Сборка и пуш образов (оба варианта)
+- `ansible/deploy-services.yml` **заменяет** монолитный `deploy-backend.yml`
+  (тот деплоил один образ `handmade-backend` на порт 3000 — он больше не собирается).
+- В `network.tf` security-группа `backend` открывает порты **8001–8005** (под
+  микросервисы) вместо прежнего одиночного 3000.
+- Папка `Ansible/` переименована в `ansible/` (нижний регистр) — учтено в путях запуска.
 
-Контекст сборки — корень репозитория приложения:
+## Быстрый порядок (детали — в DEPLOY.md)
+
 ```bash
-for s in identity catalog orders sellers platform worker; do
-  docker build -f services/$s/Dockerfile -t cr.yandex/<reg>/handmade-$s:latest .
-  docker push cr.yandex/<reg>/handmade-$s:latest
-done
+cd infra/terraform
+cp terraform.tfvars.example terraform.tfvars   # заполнить cloud_id/folder_id/service_account_id
+cp ~/key.json ./key.json                       # ключ сервис-аккаунта
+terraform init && terraform apply              # создаёт ресурсы + hosts.ini
+
+# собрать и запушить 6 образов (из корня репозитория) — см. DEPLOY.md §3
+
+cp ~/pg_ca.crt ../ansible/files/root.crt       # CA Managed PostgreSQL
+ansible -m ping all                            # из infra/terraform (ansible.cfg здесь)
+ansible-playbook ../ansible/deploy-services.yml
+curl http://$(terraform output -raw load_balancer_ip)/health
 ```
-
-## Что добавить в `group_vars/all` (если ещё нет)
-```yaml
-registry: "cr.yandex/crp8b0ggroptcd9dso2t"   # ваш реестр
-image_tag: "latest"
-# уже должны существовать из Terraform outputs:
-# postgres_host, postgres_user, postgres_password, postgres_database
-# kong_db_user, kong_db_password, kong_db_name, kong_image
-# redis_host, redis_password
-```
-
-## CA-сертификат Managed PostgreSQL
-Плейбук монтирует `/opt/handmade/certs/root.crt` в контейнеры (`DB_SSL=true`,
-`DB_SSL_ROOT_CERT=/app/certs/root.crt`). Положите CA Yandex в `Ansible/files/root.crt`
-(скачивается из консоли Managed PostgreSQL) — задача `copy` его разложит на узлы.
-Если внутри VPC через пулер :6432 TLS не требуется — выставьте `DB_SSL: "false"` в `app_env`.
-
-## Файлы
-| Файл | Назначение |
-|---|---|
-| `ansible/deploy-services.yml` | Полный плейбук (Вариант A): образы, migrate, контейнеры, Kong-маршруты |
-| `terraform/compute_services.tf` | Вариант B: per-service instance groups (for_each) |
-| `terraform/variables_services.tf` | Вариант B: карта сервисов и сайзинг |
-| `terraform/outputs_services.tf` | Вариант B: target-группы/адреса для Kong |
-| `STAGE2_INFRA_CHANGES.md` | Таблица маршрутов Kong, порты, чек-лист выката |

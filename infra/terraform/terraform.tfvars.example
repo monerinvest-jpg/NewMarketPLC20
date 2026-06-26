@@ -1,0 +1,19 @@
+# Скопируйте в terraform.tfvars и заполните. Обязательные переменные (без дефолтов):
+cloud_id           = "b1g..."   # Yandex Cloud ID  (yc resource-manager cloud list)
+folder_id          = "b1g..."   # Folder ID        (yc resource-manager folder list)
+service_account_id = "aje..."   # ID сервис-аккаунта для instance-групп
+
+# Путь к ВАШЕМУ публичному SSH-ключу (по умолчанию в репозитории — /home/it/.ssh/id_rsa.pub):
+public_ssh_key_path = "/home/youruser/.ssh/id_rsa.pub"
+
+# --- Опционально: переопределение дефолтов ---
+# project_name   = "handmade"        # ВНИМАНИЕ: инвентарь жёстко прописывает postgres_user=handmade_user.
+#                                    # Если меняете project_name — поправьте и outputs.tf (postgres_user/postgres_database).
+# environment    = "production"
+# default_zone   = "ru-central1-a"
+# backend_count  = 2
+# kong_count     = 2
+# backend_cores  = 2
+# backend_memory = 2
+# postgres_preset = "s2.micro"
+# redis_preset    = "b3-c1-m4"

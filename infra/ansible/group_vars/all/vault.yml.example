@@ -1,0 +1,16 @@
+# ШАБЛОН. Реальный файл group_vars/all/vault.yml в инфра-репозитории зашифрован
+# ansible-vault и содержит секреты. Для нашего deploy-services.yml эти переменные
+# в общем случае НЕ обязательны: postgres_*/redis_* берутся из сгенерированного
+# Terraform инвентаря hosts.ini ([all:vars]), SECRET_KEY/REFRESH_SECRET_KEY
+# плейбук генерирует сам (openssl), а registry задан прямо в плейбуке.
+#
+# Заведите этот файл (и зашифруйте) ТОЛЬКО если хотите переопределять секреты/реестр:
+#
+#   ansible-vault create group_vars/all/vault.yml
+#   ansible-playbook ../ansible/deploy-services.yml --ask-vault-pass
+#
+# Возможные ключи:
+# registry: "cr.yandex/crp8b0ggroptcd9dso2t"
+# image_tag: "latest"
+# Любые переопределения app_env (например, реквизиты YooKassa/SMTP/CDEK), если
+# не хотите задавать их через настройки в админке.

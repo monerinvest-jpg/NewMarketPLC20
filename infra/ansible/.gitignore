@@ -1,0 +1,3 @@
+# CA-сертификат и расшифрованные секреты не коммитим
+files/root.crt
+group_vars/all/vault.yml

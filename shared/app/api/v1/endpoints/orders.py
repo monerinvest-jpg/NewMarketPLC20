@@ -25,7 +25,7 @@ from app.services import gift_service
 from app.services.commission_service import calculate_item_financials, get_effective_commission
 from app.services.delivery_service import get_delivery_gateway
 from app.services.payment_service import get_payment_gateway
-from app.services.payout_service import payout_sellers_for_order, refund_sellers_for_order
+from app.services.payout_service import payout_sellers_for_order
 from app.services.referral_service import process_buyer_referral_reward, process_seller_referral_reward
 from app.services.settings_service import get_referral_settings
 
@@ -222,8 +222,14 @@ async def create_order(
     db.add(order)
     await db.flush()
 
-    # 9. Create order items (with their own per-shop financials) and reserve stock
-    for item_data in item_financials:
+    # 9. Create order items (with their own per-shop financials) and reserve stock.
+    # Reserve in a deterministic (product_id, variant_id) order so concurrent
+    # checkouts acquire the row locks in the same sequence and never deadlock.
+    from app.services.stock_service import reserve_stock
+    for item_data in sorted(
+        item_financials,
+        key=lambda d: (d["product"].id, d.get("variant").id if d.get("variant") else 0),
+    ):
         variant = item_data.get("variant")
         oi = OrderItem(
             order_id=order.id,
@@ -239,18 +245,16 @@ async def create_order(
             payout_status="pending",
         )
         db.add(oi)
-        # Reserve stock from the variant if present, otherwise from the product
-        if variant is not None:
-            variant.quantity -= item_data["quantity"]
-        else:
-            item_data["product"].quantity -= item_data["quantity"]
-        # Log the reservation as a stock movement (quantity already applied above)
-        from app.services.stock_service import record_movement
-        await record_movement(
-            db, item_data["product"].id, -item_data["quantity"], "order",
-            variant_id=variant.id if variant else None,
-            note=f"Заказ", apply_to_stock=False,
-        )
+        # Atomically lock the row, re-validate availability and decrement —
+        # this is the authoritative stock check (the loop at step 2 is only a
+        # fast pre-flight and is not race-safe on its own).
+        try:
+            await reserve_stock(
+                db, item_data["product"].id, item_data["quantity"],
+                variant_id=variant.id if variant else None,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=409, detail=str(exc))
 
     await db.flush()
 
@@ -587,11 +591,11 @@ async def update_order_status(
         link=f"/orders/{order.id}",
     )
 
-    # On refund: return money via gateway. Only applies if the order was
-    # actually paid before this cancellation (checked against previous_status,
-    # not the already-overwritten order.status).
-    if payload.status == OrderStatus.cancelled and previous_status == OrderStatus.paid:
-        if order.payment and order.payment.gateway_payment_id:
+    if payload.status == OrderStatus.cancelled:
+        # Money is only returned via the gateway when the order was actually
+        # paid before this cancellation (checked against previous_status, not
+        # the already-overwritten order.status).
+        if previous_status == OrderStatus.paid and order.payment and order.payment.gateway_payment_id:
             # 54-ФЗ: build a full refund receipt (возврат прихода) mirroring the
             # order so YooKassa registers the refund fiscal document.
             refund_receipt = None
@@ -616,6 +620,9 @@ async def update_order_status(
             try:
                 gw = get_payment_gateway()
                 await gw.refund_payment(order.payment.gateway_payment_id, order.total_price, receipt=refund_receipt)
+                # Mark refunded here so the gateway's own "refunded" webhook
+                # (which this call triggers) sees the order already cancelled
+                # and skips the reversal instead of double-restoring.
                 order.payment.status = PaymentStatus.refunded
             except Exception:
                 pass  # Log in production
@@ -628,28 +635,11 @@ async def update_order_status(
                     )
                 except Exception:
                     pass
-        # Restore stock and mark any not-yet-paid items as refunded so a
-        # later auto-complete task never pays out for a cancelled order
-        await refund_sellers_for_order(order, db)
-        from app.services.stock_service import record_movement
-        for item in order.items:
-            if item.variant_id:
-                from app.models.models import ProductVariant
-                v = (await db.execute(select(ProductVariant).where(ProductVariant.id == item.variant_id))).scalar_one_or_none()
-                if v:
-                    v.quantity += item.quantity
-            else:
-                item.product.quantity += item.quantity
-            await record_movement(
-                db, item.product_id, item.quantity, "cancel",
-                variant_id=item.variant_id, note="Отмена заказа", apply_to_stock=False,
-            )
-        # Return bonus
-        if order.bonus_used > 0:
-            buyer_res = await db.execute(select(User).where(User.id == order.buyer_id))
-            buyer = buyer_res.scalar_one_or_none()
-            if buyer:
-                buyer.bonus_balance += order.bonus_used
+        # Restore stock + buyer bonus/promo + coupon usage. This runs for ANY
+        # cancellation (paid or still-pending-payment), since stock is reserved
+        # at order creation regardless of payment state.
+        from app.services.order_reversal_service import restore_order
+        await restore_order(db, order)
 
     await db.commit()
     await db.refresh(order)
@@ -729,6 +719,11 @@ async def yookassa_webhook(request: Request, db: AsyncSession = Depends(get_db))
         return {"status": "order_not_found"}
 
     if yoo_status == "succeeded":
+        # Idempotency: YooKassa re-delivers notifications until it gets a 200.
+        # Only run the transition the first time (while still pending), so a
+        # retried webhook never re-applies anything.
+        if payment.status != PaymentStatus.pending:
+            return {"status": "ok"}
         from datetime import datetime, timezone
         payment.status = PaymentStatus.succeeded
         payment.paid_at = datetime.now(timezone.utc)
@@ -746,16 +741,19 @@ async def yookassa_webhook(request: Request, db: AsyncSession = Depends(get_db))
         for fr in income_receipts:
             fiscal_service.apply_registration(fr, registration, raw=obj)
     elif yoo_status in ("cancelled", "refunded"):
-        payment.status = PaymentStatus.cancelled
+        # Idempotency: skip if this order was already cancelled — either by a
+        # prior delivery of this same webhook, or by a manual cancel (which
+        # also issues the gateway refund that triggers THIS notification).
+        # Without this guard the stock/balances would be restored twice.
+        if order.status == OrderStatus.cancelled:
+            return {"status": "ok"}
+        payment.status = (
+            PaymentStatus.refunded if yoo_status == "refunded" else PaymentStatus.cancelled
+        )
         order.status = OrderStatus.cancelled
-        # Restore stock
-        from app.services.stock_service import record_movement
-        for item in order.items:
-            item.product.quantity += item.quantity
-            await record_movement(
-                db, item.product_id, item.quantity, "cancel",
-                variant_id=item.variant_id, note="Отмена платежа", apply_to_stock=False,
-            )
+        # Restore stock + buyer bonus/promo + coupon usage in one place.
+        from app.services.order_reversal_service import restore_order
+        await restore_order(db, order)
 
     await db.commit()
     return {"status": "ok"}

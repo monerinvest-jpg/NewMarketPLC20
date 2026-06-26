@@ -58,6 +58,61 @@ async def record_movement(
     return movement
 
 
+async def reserve_stock(
+    db: AsyncSession,
+    product_id: int,
+    quantity: int,
+    variant_id: Optional[int] = None,
+    note: Optional[str] = "Заказ",
+) -> int:
+    """
+    Atomically reserve `quantity` units for a checkout, guarding against
+    oversell under concurrency.
+
+    The product/variant row is locked with SELECT ... FOR UPDATE (and its
+    in-session attributes refreshed via populate_existing) so two simultaneous
+    orders for the last item are serialised: the second one sees the
+    already-decremented quantity and is rejected. A StockMovement is recorded.
+
+    Raises ValueError if the item is missing or there is not enough stock.
+    Returns the resulting quantity. Caller commits.
+    """
+    if variant_id is not None:
+        target = (await db.execute(
+            select(ProductVariant)
+            .where(ProductVariant.id == variant_id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )).scalar_one_or_none()
+        label = target.name if target else "вариант"
+    else:
+        target = (await db.execute(
+            select(Product)
+            .where(Product.id == product_id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )).scalar_one_or_none()
+        label = target.title if target else "товар"
+
+    if target is None:
+        raise ValueError("Товар не найден")
+    if target.quantity < quantity:
+        raise ValueError(
+            f"Недостаточно товара «{label}»: запрошено {quantity}, в наличии {target.quantity}"
+        )
+
+    target.quantity -= quantity
+    db.add(StockMovement(
+        product_id=product_id,
+        variant_id=variant_id,
+        change=-quantity,
+        reason="order",
+        quantity_after=target.quantity,
+        note=note,
+    ))
+    return target.quantity
+
+
 async def get_running_flash_sale(db: AsyncSession, product_id: int) -> Optional[FlashSale]:
     """Return the currently active flash sale for a product, if any."""
     now = datetime.now(timezone.utc)

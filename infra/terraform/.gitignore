@@ -1,0 +1,11 @@
+# Секреты и состояние Terraform — НИКОГДА не коммитить
+key.json
+*.tfvars
+!*.tfvars.example
+terraform.tfstate
+terraform.tfstate.*
+.terraform/
+.terraform.lock.hcl
+
+# Сгенерированный Terraform инвентарь содержит пароли БД/Redis в открытом виде
+hosts.ini
