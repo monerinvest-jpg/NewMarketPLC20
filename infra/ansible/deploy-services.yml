@@ -1,0 +1,203 @@
+# Updated deploy playbook — microservices on the EXISTING backend instance group.
+#
+# Drop-in with the current Terraform (single `yandex_compute_instance_group.backend`):
+# each backend node runs all 5 service containers on ports 8001-8005 plus a Celery
+# worker/beat, and Kong is configured with one route per path prefix. This replaces
+# the old single-container `deploy-backend.yml`.
+#
+# Inventory groups expected (same as before): `backend`, `kong`, optionally `bastion`.
+# Adjust var names to match your group_vars/all if they differ.
+---
+- name: Generate shared secrets (once)
+  hosts: backend
+  run_once: true
+  gather_facts: false
+  tasks:
+    - name: Generate SECRET_KEY
+      delegate_to: localhost
+      command: openssl rand -hex 32
+      register: _secret_key
+      changed_when: false
+
+    - name: Generate REFRESH_SECRET_KEY
+      delegate_to: localhost
+      command: openssl rand -hex 32
+      register: _refresh_secret_key
+      changed_when: false
+
+    - name: Stash secrets as facts for all backend hosts
+      set_fact:
+        secret_key: "{{ _secret_key.stdout }}"
+        refresh_secret_key: "{{ _refresh_secret_key.stdout }}"
+
+- name: Deploy marketplace microservices
+  hosts: backend
+  become: true
+  vars:
+    # Container registry and image tag — adjust folder/registry id to yours.
+    registry: "cr.yandex/crp8b0ggroptcd9dso2t"
+    image_tag: "latest"
+
+    # Service name -> host port (container always listens on 8000).
+    services:
+      identity: 8001
+      catalog:  8002
+      orders:   8003
+      sellers:  8004
+      platform: 8005
+
+    # Shared env contract for every service/worker container.
+    # postgres_*/redis_*/kong_* come from group_vars/all (Terraform outputs).
+    app_env:
+      DATABASE_URL: "postgresql+asyncpg://{{ postgres_user }}:{{ postgres_password }}@{{ postgres_host }}:6432/{{ postgres_database }}"
+      DB_HOST: "{{ postgres_host }}"
+      DB_PORT: "6432"
+      DB_USER: "{{ postgres_user }}"
+      DB_PASSWORD: "{{ postgres_password }}"
+      DB_NAME: "{{ postgres_database }}"
+      # Managed PostgreSQL requires TLS. Ship the Yandex CA to the nodes and point here.
+      DB_SSL: "true"
+      DB_SSL_ROOT_CERT: "/app/certs/root.crt"
+      REDIS_URL: "redis://:{{ redis_password }}@{{ redis_host }}:6379/0"
+      SECRET_KEY: "{{ hostvars[groups['backend'][0]].secret_key }}"
+      REFRESH_SECRET_KEY: "{{ hostvars[groups['backend'][0]].refresh_secret_key }}"
+      JWT_ALGORITHM: "HS256"
+      ACCESS_TOKEN_EXPIRE_MINUTES: "30"
+      REFRESH_TOKEN_EXPIRE_DAYS: "30"
+
+  tasks:
+    - name: Ensure Docker is present
+      apt:
+        name: docker.io
+        state: present
+        update_cache: true
+
+    - name: Authenticate Docker to Yandex Container Registry
+      # Uses the instance metadata IAM token (SA attached to the backend group).
+      shell: |
+        set -e
+        TOKEN=$(curl -s -H "Metadata-Flavor: Google" \
+          "http://169.254.169.254/computeMetadata/v1/instance/service-accounts/default/token" \
+          | python3 -c "import sys,json;print(json.load(sys.stdin)['access_token'])")
+        echo "$TOKEN" | docker login --username iam --password-stdin cr.yandex
+      changed_when: false
+
+    - name: Distribute the Yandex Managed PostgreSQL CA certificate
+      # Source the CA in your repo (e.g. files/root.crt) or fetch from Yandex.
+      copy:
+        src: files/root.crt
+        dest: /opt/handmade/certs/root.crt
+        mode: "0644"
+
+    - name: Run database migrations + seed (once, against the shared DB)
+      run_once: true
+      shell: >
+        docker run --rm
+        {% for k, v in app_env.items() %}-e {{ k }}={{ v | quote }} {% endfor %}
+        -v /opt/handmade/certs:/app/certs:ro
+        {{ registry }}/handmade-identity:{{ image_tag }} sh -c
+        "/app/entrypoint.sh migrate && /app/entrypoint.sh seed"
+      register: _migrate
+      changed_when: "'Running upgrade' in _migrate.stdout or 'seed' in _migrate.stdout"
+
+    - name: Run each service container
+      loop: "{{ services | dict2items }}"
+      loop_control:
+        label: "{{ item.key }}:{{ item.value }}"
+      shell: >
+        docker rm -f handmade-{{ item.key }} 2>/dev/null || true;
+        docker run -d --name handmade-{{ item.key }} --restart always
+        -p {{ item.value }}:8000
+        {% for k, v in app_env.items() %}-e {{ k }}={{ v | quote }} {% endfor %}
+        -v /opt/handmade/certs:/app/certs:ro
+        {{ registry }}/handmade-{{ item.key }}:{{ image_tag }} web
+
+    - name: Run Celery worker (once on the first backend node)
+      run_once: true
+      shell: >
+        docker rm -f handmade-worker 2>/dev/null || true;
+        docker run -d --name handmade-worker --restart always
+        {% for k, v in app_env.items() %}-e {{ k }}={{ v | quote }} {% endfor %}
+        -v /opt/handmade/certs:/app/certs:ro
+        {{ registry }}/handmade-worker:{{ image_tag }} worker
+
+    - name: Run Celery beat (once on the first backend node)
+      run_once: true
+      shell: >
+        docker rm -f handmade-beat 2>/dev/null || true;
+        docker run -d --name handmade-beat --restart always
+        {% for k, v in app_env.items() %}-e {{ k }}={{ v | quote }} {% endfor %}
+        -v /opt/handmade/certs:/app/certs:ro
+        {{ registry }}/handmade-worker:{{ image_tag }} beat
+
+- name: Configure Kong routes (one route per path prefix)
+  hosts: kong
+  run_once: true
+  become: true
+  vars:
+    kong_admin: "http://localhost:8001"
+    # Kong reaches the services on the first backend node (multiplexed ports).
+    backend_host: "{{ hostvars[groups['backend'][0]].ansible_host | default(groups['backend'][0]) }}"
+    # service -> [port, [path prefixes]]
+    routes:
+      identity:
+        port: 8001
+        paths: ["/api/v1/auth", "/api/v1/users", "/api/v1/2fa", "/health"]
+        priority: 0
+      catalog:
+        port: 8002
+        paths: ["/api/v1/products", "/api/v1/shops", "/api/v1/reviews", "/api/v1/categories",
+                "/api/v1/variants", "/api/v1/attributes", "/api/v1/questions", "/api/v1/home",
+                "/api/v1/recommendations", "/api/v1/favorites", "/api/v1/catalog",
+                "/api/v1/sitemap.xml", "/uploads"]
+        priority: 0
+      orders:
+        port: 8003
+        paths: ["/api/v1/cart", "/api/v1/orders", "/api/v1/returns", "/api/v1/sub-orders",
+                "/api/v1/product-subscriptions", "/api/v1/disputes", "/api/v1/addresses",
+                "/api/v1/wishlists", "/api/v1/recently-viewed", "/api/v1/delivery"]
+        priority: 0
+      sellers:
+        port: 8004
+        paths: ["/api/v1/seller", "/api/v1/subscription", "/api/v1/promotions", "/api/v1/upload"]
+        priority: 0
+      platform:
+        port: 8005
+        paths: ["/api/v1/notifications", "/api/v1/chat", "/api/v1/support",
+                "/api/v1/gift-certificates", "/api/v1/loyalty", "/api/v1/currencies",
+                "/api/v1/reports", "/api/v1/admin"]
+        priority: 0
+
+  tasks:
+    - name: Upsert a Kong service per microservice
+      loop: "{{ routes | dict2items }}"
+      loop_control:
+        label: "{{ item.key }}"
+      uri:
+        url: "{{ kong_admin }}/services/{{ item.key }}"
+        method: PUT
+        body_format: form-urlencoded
+        body:
+          url: "http://{{ backend_host }}:{{ item.value.port }}"
+        status_code: [200, 201]
+
+    - name: Create routes per service (one route holding all its prefixes)
+      loop: "{{ routes | dict2items }}"
+      loop_control:
+        label: "{{ item.key }}"
+      uri:
+        url: "{{ kong_admin }}/services/{{ item.key }}/routes"
+        method: POST
+        body_format: form-urlencoded
+        body: >-
+          name={{ item.key }}-route&strip_path=false&regex_priority={{ item.value.priority }}{% for p in item.value.paths %}&paths[]={{ p }}{% endfor %}
+        status_code: [200, 201, 409]
+
+    - name: Add the high-priority /seller/sub-orders route to the orders service
+      # Must outrank the broad /api/v1/seller route owned by the sellers service.
+      uri:
+        url: "{{ kong_admin }}/services/orders/routes"
+        method: POST
+        body_format: form-urlencoded
+        body: "name=orders-suborders&strip_path=false&regex_priority=100&paths[]=/api/v1/seller/sub-orders"
+        status_code: [200, 201, 409]

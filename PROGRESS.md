@@ -196,3 +196,30 @@
 - Фикс: вынес disputeStatusMeta в src/lib/disputeMeta.ts; DisputesPage/SellerDisputes/DisputeDesk импортируют оттуда.
 - Прочее: меж-страничных импортов значений больше нет (проверено); конфиги @-алиаса (vite+tsconfig) корректны; VITE_API_URL опционален (есть прокси).
 - Блок 7 (KYC) был начат и откачен до чистого состояния — доделаю отдельным блоком.
+
+---
+
+## Рефакторинг под Yandex Cloud (PostgreSQL + микросервисы)
+
+### Этап 1 — PostgreSQL + адаптация под инфру  [DONE]
+- Драйвер asyncmy → asyncpg; MySQL → Managed PostgreSQL 17 (порт-пулер 6432).
+- config.py: MYSQL_* → DB_*; принимает готовый DATABASE_URL от Ansible; JWT_ALGORITHM-алиас;
+  REFRESH_SECRET_KEY; Celery из REDIS_URL; DB_SSL/DB_SSL_ROOT_CERT (TLS Managed PG).
+- security.py: refresh-токены отдельным секретом. database.py/alembic: TLS connect_args.
+- Dockerfile: убраны MySQL-библиотеки; entrypoint.sh диспетчер migrate/web/worker/beat/seed.
+- models.py: enum'ы native_enum=False (VARCHAR+CHECK) — портируемость, нет дублей CREATE TYPE.
+- 0001_initial: миграция из Base.metadata (была MySQL-DDL). docker-compose/.env → Postgres.
+
+### Этап 2 — разбиение монолита на сервисы (общая БД)  [DONE — код]
+- backend/ → shared/ (пакет `app` остаётся как shared-библиотека, импорты не менялись).
+- Удалена монолитная точка входа app/main.py + единый Dockerfile.
+- shared/app/service_factory.py — фабрика FastAPI (CORS/limiter/uploads/health).
+- 5 сервисов (services/{identity,catalog,orders,sellers,platform}/main.py + Dockerfile) +
+  worker. Все 38 роутеров распределены по сервисам ровно по разу.
+- 3 роутера переназначены ради чистоты префиксов: disputes.seller→sellers,
+  promotions.admin→platform, promo.public→catalog; точечный маршрут /seller/sub-orders→orders.
+- gateway/nginx.conf — локальный gateway (зеркало Kong). docker-compose: gateway + 5 сервисов +
+  worker/beat + migrate-job + Postgres/Redis.
+- infra/STAGE2_INFRA_CHANGES.md — патч для Terraform/Ansible-репозитория (образы, порты,
+  таблица маршрутов Kong). Сам инфра-репозиторий правится отдельно.
+- Проверено: py_compile всех изменённых файлов проходит. Импорт-проверка/прогон — в облаке (нет лок. теста).

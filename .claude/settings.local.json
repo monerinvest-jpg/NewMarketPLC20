@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "PowerShell(Rename-Item -Path \"backend\" -NewName \"shared\")",
+      "PowerShell(if \\($?\\) { \"renamed\" })",
+      "PowerShell(\"removed monolith entry + old Dockerfile\")",
+      "PowerShell(Get-ChildItem -Path infra -Recurse -File | ForEach-Object { $_.FullName.Replace\\(\\(Get-Location\\).Path + '\\\\',''\\) })"
+    ]
+  }
+}

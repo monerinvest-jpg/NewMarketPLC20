@@ -2,7 +2,15 @@
 
 Полнофункциональный маркетплейс с прямыми продавцами, реферальной программой,
 гибкими комиссиями и полной админ-панелью. Backend на FastAPI (async),
-frontend на React + TypeScript, очереди на Celery + Redis, БД — MySQL 8.
+frontend на React + TypeScript, очереди на Celery + Redis, БД — **PostgreSQL**
+(Yandex Managed PostgreSQL в проде).
+
+> **Архитектура: микросервисы на общей БД.** Backend разбит на shared-библиотеку
+> (`shared/`) и 5 независимо деплоящихся сервисов (`services/identity`, `catalog`,
+> `orders`, `sellers`, `platform`) + worker. Маршрутизация — через API-gateway
+> (Kong в проде, nginx локально) по префиксам пути. См. [STAGE2_PLAN.md](STAGE2_PLAN.md)
+> и [infra/STAGE2_INFRA_CHANGES.md](infra/STAGE2_INFRA_CHANGES.md). Развёртывание —
+> Yandex Cloud (Terraform + Ansible), БД и Redis — managed-сервисы.
 
 ---
 
@@ -124,30 +132,37 @@ CDEK_CLIENT_SECRET=ваш_client_secret_сдэк
 docker-compose up -d --build
 ```
 
-Это поднимет 6 контейнеров:
+Это поднимет стек микросервисов:
 | Контейнер | Назначение | Порт |
 |---|---|---|
-| `marketplace_db` | MySQL 8.0 | 3306 |
+| `marketplace_db` | PostgreSQL 17 | 5432 |
 | `marketplace_redis` | Redis (брокер Celery) | 6379 |
-| `marketplace_backend` | FastAPI + Uvicorn | 8000 |
-| `marketplace_celery_worker` | Обработка фоновых задач | — |
-| `marketplace_celery_beat` | Планировщик (автозавершение заказов) | — |
+| `marketplace_migrate` | One-shot: миграции + сидинг | — |
+| `marketplace_gateway` | API-gateway (nginx, зеркало Kong) | 8000 |
+| `marketplace_identity` | Сервис: auth, users, 2FA | (через gateway) |
+| `marketplace_catalog` | Сервис: товары, магазины, отзывы | (через gateway) |
+| `marketplace_orders` | Сервис: корзина, заказы, возвраты, доставка | (через gateway) |
+| `marketplace_sellers` | Сервис: инструменты продавца, тарифы, промо | (через gateway) |
+| `marketplace_platform` | Сервис: уведомления, лояльность, админка | (через gateway) |
+| `marketplace_worker` / `_beat` | Celery worker / планировщик | — |
 | `marketplace_frontend` | React (nginx) | 3000 |
+
+Все API-вызовы идут на `http://localhost:8000/api/v1/*` → gateway разводит по сервисам.
 
 ### 4. Применение миграций
 
-Миграции и сидинг **выполняются автоматически** при старте backend-контейнера
-(см. команду в `docker-compose.yml`):
+Миграции и сидинг выполняет **отдельный one-shot контейнер `migrate`** (общая БД),
+все сервисы ждут его завершения. Команда — в `docker-compose.yml`:
 
 ```bash
-alembic upgrade head && python scripts/seed.py && uvicorn app.main:app ...
+/app/entrypoint.sh migrate && /app/entrypoint.sh seed
 ```
 
 Если нужно прогнать вручную:
 
 ```bash
-docker exec -it marketplace_backend alembic upgrade head
-docker exec -it marketplace_backend python scripts/seed.py
+docker compose run --rm migrate sh -c "/app/entrypoint.sh migrate"
+docker compose run --rm migrate sh -c "/app/entrypoint.sh seed"
 ```
 
 ### 5. Создание супер-администратора
@@ -347,15 +362,20 @@ FIRST_SUPERUSER_PASSWORD=admin123
 
 ## 🛠️ Локальная разработка без Docker
 
-**Backend:**
+**Backend (shared-библиотека + один сервис):**
 ```bash
-cd backend
+cd shared
 python -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
-cp ../.env.example ../.env  # настройте DATABASE_URL на localhost
+cp ../.env.example ../.env  # DB_HOST=localhost, DB_PORT=5432 (PostgreSQL)
 alembic upgrade head
 python scripts/seed.py
-uvicorn app.main:app --reload
+# Запуск конкретного сервиса (из корня репозитория):
+#   PYTHONPATH=shared делает пакет `app` импортируемым,
+#   --app-dir указывает на каталог с main.py сервиса.
+cd ..
+PYTHONPATH=shared uvicorn --app-dir services/identity main:app --reload
+# (или catalog/orders/sellers/platform). Проще поднять весь стек: docker compose up.
 ```
 
 **Frontend:**
