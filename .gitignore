@@ -27,9 +27,22 @@ npm-debug.log*
 .DS_Store
 
 # Docker volumes data (if mounted locally)
-mysql_data/
+postgres_data/
 uploads_data/
 
 # Uploads (runtime data)
-backend/app/uploads/*
-!backend/app/uploads/.gitkeep
+shared/app/uploads/*
+!shared/app/uploads/.gitkeep
+
+# ── Infra secrets / state (дублируем как защитную сетку; в infra/* свои .gitignore) ──
+# Ключ сервис-аккаунта, переменные с секретами, стейт и сгенерированный инвентарь
+key.json
+*.tfvars
+!*.tfvars.example
+*.tfstate
+*.tfstate.*
+.terraform/
+hosts.ini
+# CA-сертификат Managed PostgreSQL и расшифрованные секреты Ansible
+infra/ansible/files/root.crt
+infra/ansible/group_vars/all/vault.yml

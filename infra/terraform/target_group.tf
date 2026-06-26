@@ -19,6 +19,6 @@ resource "yandex_lb_target_group" "kong" {
   # Явная зависимость: ждём либо группу напрямую, либо паузу (или оба)
   depends_on = [
     yandex_compute_instance_group.kong,
-    time_sleep.wait_for_kong   # если используете time_sleep, иначе уберите эту строку
+    time_sleep.wait_for_kong # если используете time_sleep, иначе уберите эту строку
   ]
 }

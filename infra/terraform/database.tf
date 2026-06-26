@@ -25,14 +25,14 @@ resource "yandex_mdb_postgresql_cluster" "main" {
   }
 
   host {
-    zone      = "ru-central1-a"
-    subnet_id = yandex_vpc_subnet.private.id
+    zone             = "ru-central1-a"
+    subnet_id        = yandex_vpc_subnet.private.id
     assign_public_ip = false
   }
 
   host {
-    zone      = "ru-central1-b"
-    subnet_id = yandex_vpc_subnet.private_b.id
+    zone             = "ru-central1-b"
+    subnet_id        = yandex_vpc_subnet.private_b.id
     assign_public_ip = false
   }
 }
