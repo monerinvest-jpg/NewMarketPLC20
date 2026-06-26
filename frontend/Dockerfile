@@ -11,7 +11,7 @@ COPY . .
 ARG VITE_API_URL=http://localhost:8000
 ENV VITE_API_URL=$VITE_API_URL
 
-RUN npm run build
+RUN npx vite build
 
 # ── Production stage (nginx) ───────────────────────────────
 FROM nginx:1.27-alpine

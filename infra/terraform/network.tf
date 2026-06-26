@@ -107,6 +107,13 @@ resource "yandex_vpc_security_group" "backend" {
   }
 
   ingress {
+    description    = "Frontend SPA port from Kong"
+    protocol       = "TCP"
+    port           = 3000
+    v4_cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
     description    = "SSH from Bastion"
     protocol       = "TCP"
     port           = 22
