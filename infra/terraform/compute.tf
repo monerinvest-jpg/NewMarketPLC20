@@ -50,6 +50,7 @@ resource "yandex_compute_instance_group" "kong" {
   depends_on = [yandex_mdb_postgresql_cluster.main, yandex_mdb_redis_cluster.cache]
 
   instance_template {
+    service_account_id = var.service_account_id
     platform_id = "standard-v3"
     resources {
       cores         = var.kong_cores
@@ -101,7 +102,7 @@ resource "yandex_compute_instance_group" "kong" {
   # Блок application_load_balancer удалён
 
   timeouts {
-    create = "20m"
+    create = "30m"
     update = "20m"
     delete = "15m"
   }
@@ -116,6 +117,7 @@ resource "yandex_compute_instance_group" "backend" {
   depends_on = [yandex_mdb_postgresql_cluster.main, yandex_mdb_redis_cluster.cache]
 
   instance_template {
+    service_account_id = var.service_account_id
     platform_id = "standard-v3"
     resources {
       cores         = var.backend_cores
@@ -164,12 +166,9 @@ resource "yandex_compute_instance_group" "backend" {
     }
   }
 
-  application_load_balancer {
-    target_group_name = "${var.project_name}-backend-tg"
-  }
 
   timeouts {
-    create = "20m"
+    create = "30m"
     update = "20m"
     delete = "15m"
   }

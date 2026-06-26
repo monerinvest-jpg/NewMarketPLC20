@@ -4,6 +4,7 @@ resource "yandex_lb_network_load_balancer" "public" {
   listener {
     name = "http"
     port = 80
+    target_port = 8000
     external_address_spec {
       ip_version = "ipv4"
     }

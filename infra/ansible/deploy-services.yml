@@ -82,6 +82,12 @@
         echo "$TOKEN" | docker login --username iam --password-stdin cr.yandex
       changed_when: false
 
+    - name: Ensure certs directory exists
+      file:
+        path: /opt/handmade/certs
+        state: directory
+        mode: "0755"
+
     - name: Distribute the Yandex Managed PostgreSQL CA certificate
       # Source the CA in your repo (e.g. files/root.crt) or fetch from Yandex.
       copy:
@@ -92,7 +98,7 @@
     - name: Run database migrations + seed (once, against the shared DB)
       run_once: true
       shell: >
-        docker run --rm
+        docker run --rm --pull always
         {% for k, v in app_env.items() %}-e {{ k }}={{ v | quote }} {% endfor %}
         -v /opt/handmade/certs:/app/certs:ro
         {{ registry }}/handmade-identity:{{ image_tag }} sh -c
@@ -106,7 +112,7 @@
         label: "{{ item.key }}:{{ item.value }}"
       shell: >
         docker rm -f handmade-{{ item.key }} 2>/dev/null || true;
-        docker run -d --name handmade-{{ item.key }} --restart always
+        docker run -d --pull always --name handmade-{{ item.key }} --restart always
         -p {{ item.value }}:8000
         {% for k, v in app_env.items() %}-e {{ k }}={{ v | quote }} {% endfor %}
         -v /opt/handmade/certs:/app/certs:ro
@@ -116,7 +122,7 @@
       run_once: true
       shell: >
         docker rm -f handmade-worker 2>/dev/null || true;
-        docker run -d --name handmade-worker --restart always
+        docker run -d --pull always --name handmade-worker --restart always
         {% for k, v in app_env.items() %}-e {{ k }}={{ v | quote }} {% endfor %}
         -v /opt/handmade/certs:/app/certs:ro
         {{ registry }}/handmade-worker:{{ image_tag }} worker
@@ -125,7 +131,7 @@
       run_once: true
       shell: >
         docker rm -f handmade-beat 2>/dev/null || true;
-        docker run -d --name handmade-beat --restart always
+        docker run -d --pull always --name handmade-beat --restart always
         {% for k, v in app_env.items() %}-e {{ k }}={{ v | quote }} {% endfor %}
         -v /opt/handmade/certs:/app/certs:ro
         {{ registry }}/handmade-worker:{{ image_tag }} beat
