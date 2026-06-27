@@ -43,6 +43,10 @@ key.json
 *.tfstate.*
 .terraform/
 hosts.ini
+# Terraform saved plans embed sensitive values (DB/Redis passwords)
+tfplan
+tfplan*
+*.tfplan
 # CA-сертификат Managed PostgreSQL и расшифрованные секреты Ansible
 infra/ansible/files/root.crt
 infra/ansible/group_vars/all/vault.yml

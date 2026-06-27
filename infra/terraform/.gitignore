@@ -9,3 +9,8 @@ terraform.tfstate.*
 
 # Сгенерированный Terraform инвентарь содержит пароли БД/Redis в открытом виде
 hosts.ini
+
+# Сохранённые планы Terraform содержат значения sensitive (пароли) — НЕ коммитить
+tfplan
+tfplan*
+*.tfplan

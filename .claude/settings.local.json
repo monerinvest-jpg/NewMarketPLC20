@@ -11,7 +11,8 @@
       "PowerShell(Get-ChildItem shared -Filter entrypoint.sh -Recurse | ForEach-Object { $_.FullName }; Write-Output \"---gateway nginx ports---\"; Select-String -Path gateway/nginx.conf -Pattern \"listen|proxy_pass|location\" | Select-Object -First 30 | ForEach-Object { $_.Line.Trim\\(\\) })",
       "PowerShell(Get-ChildItem -Recurse infra | Where-Object { $_.FullName -notmatch '\\\\.git' } | Select-Object @{n='Path';e={$_.FullName.Replace\\(\\(Get-Location\\).Path + '\\\\',''\\)}}, @{n='Type';e={if\\($_.PSIsContainer\\){'DIR'}else{'FILE'}}} | Format-Table -AutoSize)",
       "WebFetch(domain:github.com)",
-      "PowerShell(Get-ChildItem -Recurse infra -Force | Where-Object { -not $_.PSIsContainer } | ForEach-Object { $_.FullName.Replace\\(\\(Get-Location\\).Path + '\\\\',''\\) } | Sort-Object)"
+      "PowerShell(Get-ChildItem -Recurse infra -Force | Where-Object { -not $_.PSIsContainer } | ForEach-Object { $_.FullName.Replace\\(\\(Get-Location\\).Path + '\\\\',''\\) } | Sort-Object)",
+      "PowerShell(winget install --id Docker.DockerDesktop -e --source winget --accept-source-agreements --accept-package-agreements --scope machine 2>&1)"
     ]
   }
 }
