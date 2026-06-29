@@ -222,3 +222,12 @@
         body_format: form-urlencoded
         body: "name=orders-suborders&strip_path=false&regex_priority=100&paths[]=/api/v1/seller/sub-orders"
         status_code: [200, 201, 409]
+
+    - name: Enable the Kong Prometheus plugin (exposes /metrics on the admin API)
+      # Scraped by Prometheus (see observability.yml) at kong-host:8001/metrics.
+      uri:
+        url: "{{ kong_admin }}/plugins"
+        method: POST
+        body_format: form-urlencoded
+        body: "name=prometheus"
+        status_code: [200, 201, 409]

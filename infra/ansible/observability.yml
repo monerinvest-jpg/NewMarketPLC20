@@ -1,0 +1,107 @@
+# Observability stack: Prometheus + Grafana + node_exporter.
+#
+# Scrapes /metrics from every backend microservice (ports 8001-8005, exposed by
+# prometheus-fastapi-instrumentator), the Kong Prometheus plugin, and node
+# exporters. Grafana runs with anonymous read-only access so its dashboards can
+# be embedded in admin → Метрики via an <iframe> (kiosk URL).
+#
+# Inventory: a `[monitoring]` host (a small VM or the bastion) plus the existing
+# `[backend]` and `[kong]` groups. Run AFTER deploy-services.yml.
+#   ansible-playbook -i hosts.ini observability.yml
+---
+- name: node_exporter on backend + kong nodes
+  hosts: backend:kong
+  become: true
+  tasks:
+    - name: Ensure Docker is present
+      apt: { name: docker.io, state: present, update_cache: true }
+
+    - name: Run node_exporter
+      shell: >
+        docker rm -f node-exporter 2>/dev/null || true;
+        docker run -d --name node-exporter --restart always
+        --net host --pid host
+        -v /:/host:ro,rslave
+        quay.io/prometheus/node-exporter:latest --path.rootfs=/host
+      changed_when: false
+
+- name: Prometheus + Grafana
+  hosts: monitoring
+  become: true
+  vars:
+    obs_dir: /opt/observability
+    grafana_admin_password: "{{ grafana_admin_password | default('changeme') }}"
+  tasks:
+    - name: Ensure Docker is present
+      apt: { name: docker.io, state: present, update_cache: true }
+
+    - name: Create dirs
+      file: { path: "{{ item }}", state: directory, mode: "0755" }
+      loop:
+        - "{{ obs_dir }}"
+        - "{{ obs_dir }}/grafana/provisioning/datasources"
+        - "{{ obs_dir }}/grafana/provisioning/dashboards"
+
+    - name: Prometheus config (scrape backend services, kong, node exporters)
+      copy:
+        dest: "{{ obs_dir }}/prometheus.yml"
+        content: |
+          global:
+            scrape_interval: 15s
+            external_labels:
+              monitor: marketplace
+          scrape_configs:
+            - job_name: backend-services
+              metrics_path: /metrics
+              static_configs:
+                - targets:
+          {% for host in groups['backend'] %}
+          {% for port in [8001, 8002, 8003, 8004, 8005] %}
+                    - '{{ hostvars[host].ansible_host | default(host) }}:{{ port }}'
+          {% endfor %}
+          {% endfor %}
+            - job_name: kong
+              metrics_path: /metrics
+              static_configs:
+                - targets: [{% for host in groups['kong'] %}'{{ hostvars[host].ansible_host | default(host) }}:8001'{% if not loop.last %}, {% endif %}{% endfor %}]
+            - job_name: node
+              static_configs:
+                - targets:
+          {% for host in (groups['backend'] + groups['kong']) %}
+                    - '{{ hostvars[host].ansible_host | default(host) }}:9100'
+          {% endfor %}
+
+    - name: Grafana datasource provisioning (Prometheus)
+      copy:
+        dest: "{{ obs_dir }}/grafana/provisioning/datasources/prometheus.yml"
+        content: |
+          apiVersion: 1
+          datasources:
+            - name: Prometheus
+              type: prometheus
+              access: proxy
+              url: http://prometheus:9090
+              isDefault: true
+
+    - name: Prometheus container
+      shell: >
+        docker rm -f prometheus 2>/dev/null || true;
+        docker run -d --name prometheus --restart always
+        -p 9090:9090
+        -v {{ obs_dir }}/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+        prom/prometheus:latest
+      changed_when: false
+
+    - name: Grafana container (anonymous viewer for iframe embedding)
+      shell: >
+        docker rm -f grafana 2>/dev/null || true;
+        docker run -d --name grafana --restart always
+        -p 3000:3000 --link prometheus:prometheus
+        -e GF_SECURITY_ADMIN_PASSWORD={{ grafana_admin_password | quote }}
+        -e GF_AUTH_ANONYMOUS_ENABLED=true
+        -e GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
+        -e GF_SECURITY_ALLOW_EMBEDDING=true
+        -e GF_USERS_DEFAULT_THEME=light
+        -v {{ obs_dir }}/grafana/provisioning:/etc/grafana/provisioning:ro
+        grafana/grafana:latest
+      changed_when: false

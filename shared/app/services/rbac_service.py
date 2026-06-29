@@ -36,6 +36,7 @@ MENU_ITEMS = [
     ("/admin/platform-analytics", "Аналитика платформы", "analytics.view"),
     ("/admin/cohorts", "Когорты и LTV", "analytics.view"),
     ("/admin/reconciliation", "Реконсиляция", "analytics.view"),
+    ("/admin/metrics", "Метрики (Grafana)", "analytics.view"),
     ("/admin/users", "Пользователи", "users.view"),
     ("/admin/shops", "Магазины", "users.view"),
     ("/admin/moderators", "Модераторы", "users.manage"),

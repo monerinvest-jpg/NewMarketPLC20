@@ -25,6 +25,7 @@ const groups = [
       { key: '/admin/platform-analytics', icon: <AreaChartOutlined />, label: 'Аналитика платформы' },
       { key: '/admin/cohorts', icon: <RiseOutlined />, label: 'Когорты и LTV' },
       { key: '/admin/reconciliation', icon: <WalletOutlined />, label: 'Реконсиляция' },
+      { key: '/admin/metrics', icon: <AreaChartOutlined />, label: 'Метрики (Grafana)' },
     ],
   },
   {

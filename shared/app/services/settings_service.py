@@ -39,6 +39,9 @@ DEFAULTS: Dict[str, str] = {
     "smsc_use_apikey": "false",
     "sms_notify_order_status": "false",
     "sms_notify_phone_verification": "true",
+    # Observability: a Grafana dashboard URL embedded in admin → Метрики (iframe).
+    # Use a shared/anonymous or kiosk-mode URL; empty hides the embed.
+    "grafana_dashboard_url": "",
 }
 
 DESCRIPTIONS: Dict[str, str] = {

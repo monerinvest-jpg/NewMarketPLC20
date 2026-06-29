@@ -62,6 +62,7 @@ const AdminPlans = lazy(() => import('./pages/admin/AdminPlans'))
 const AdminPayouts = lazy(() => import('./pages/admin/AdminPayouts'))
 const AdminBanners = lazy(() => import('./pages/admin/AdminBanners'))
 const AdminPlatformAnalytics = lazy(() => import('./pages/admin/AdminPlatformAnalytics'))
+const AdminMetrics = lazy(() => import('./pages/admin/AdminMetrics'))
 const AdminModerationQueue = lazy(() => import('./pages/admin/AdminModerationQueue'))
 const AdminAuditLog = lazy(() => import('./pages/admin/AdminAuditLog'))
 const AdminFiscalReceipts = lazy(() => import('./pages/admin/AdminFiscalReceipts'))
@@ -231,6 +232,7 @@ function App() {
               <Route path="payouts" element={<AdminPayouts />} />
               <Route path="banners" element={<AdminBanners />} />
               <Route path="platform-analytics" element={<AdminPlatformAnalytics />} />
+              <Route path="metrics" element={<AdminMetrics />} />
               <Route path="moderation-queue" element={<AdminModerationQueue />} />
               <Route path="audit-log" element={<AdminAuditLog />} />
               <Route path="fiscal-receipts" element={<AdminFiscalReceipts />} />
