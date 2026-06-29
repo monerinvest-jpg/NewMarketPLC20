@@ -384,6 +384,29 @@ class Shop(Base):
     )
 
 
+class ShopMemberRole(str, enum.Enum):
+    owner = "owner"      # the shop owner (implicit, all permissions)
+    manager = "manager"  # full operational access (all permissions)
+    staff = "staff"      # only the explicitly granted permissions
+
+
+class ShopMember(Base):
+    """A user attached to a shop as staff, with granular per-area permissions.
+    The shop owner is implicit (Shop.owner_id) and always has everything."""
+    __tablename__ = "shop_member"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    shop_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("shop.id"), nullable=False)
+    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("user.id"), nullable=False)
+    role: Mapped[ShopMemberRole] = mapped_column(Enum(ShopMemberRole), default=ShopMemberRole.staff, nullable=False)
+    permissions: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # JSON list of permission keys
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("shop_id", "user_id", name="uq_shop_member_shop_user"),
+    )
+
+
 class Category(Base):
     __tablename__ = "category"
 

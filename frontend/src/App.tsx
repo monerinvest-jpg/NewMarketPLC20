@@ -95,6 +95,7 @@ const SellerInventory = lazy(() => import('./pages/seller/SellerInventory'))
 const SellerFlashSales = lazy(() => import('./pages/seller/SellerFlashSales'))
 const SellerChatTemplates = lazy(() => import('./pages/seller/SellerChatTemplates'))
 const SellerRequisitesPage = lazy(() => import('./pages/seller/SellerRequisitesPage'))
+const SellerStaff = lazy(() => import('./pages/seller/SellerStaff'))
 
 // Craft / wood theme: warm amber-terracotta accents on parchment, walnut text,
 // softer radii. Evokes handmade goods rather than a cold marketplace.
@@ -202,6 +203,7 @@ function App() {
                 <Route path="/seller/flash-sales" element={<SellerFlashSales />} />
                 <Route path="/seller/chat-templates" element={<SellerChatTemplates />} />
                 <Route path="/seller/requisites" element={<SellerRequisitesPage />} />
+                <Route path="/seller/staff" element={<SellerStaff />} />
               </Route>
             </Route>
 

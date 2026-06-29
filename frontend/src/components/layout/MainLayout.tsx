@@ -98,6 +98,7 @@ export default function MainLayout() {
             { key: 'seller-promotion', label: <Link to="/seller/promotion">Продвижение</Link> },
             { key: 'seller-chat-templates', label: <Link to="/seller/chat-templates">Чат: шаблоны и часы</Link> },
             { key: 'seller-requisites', label: <Link to="/seller/requisites">Налоговые реквизиты</Link> },
+            { key: 'seller-staff', label: <Link to="/seller/staff">Сотрудники</Link> },
             { key: 'seller-payouts', label: <Link to="/seller/payouts">Вывод средств</Link> },
             { key: 'seller-plan', label: <Link to="/seller/plan">Тариф и комиссия</Link> },
             { key: 'seller-disputes', label: <Link to="/seller/disputes">Споры по заказам</Link> },

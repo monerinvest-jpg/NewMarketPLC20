@@ -71,10 +71,18 @@ async def get_current_user_optional(
     return user
 
 
-async def get_current_seller(current_user: User = Depends(get_current_user)) -> User:
-    if current_user.role not in (UserRole.seller, UserRole.superadmin):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Seller access required")
-    return current_user
+async def get_current_seller(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> User:
+    """Sellers, superadmins, AND shop staff (members of a shop) may reach the
+    seller cabinet. Fine-grained per-area gating is done with shop permissions."""
+    if current_user.role in (UserRole.seller, UserRole.superadmin):
+        return current_user
+    from app.services.shop_membership_service import is_shop_member
+    if await is_shop_member(db, current_user):
+        return current_user
+    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Seller access required")
 
 
 async def get_current_moderator_or_admin(current_user: User = Depends(get_current_user)) -> User:

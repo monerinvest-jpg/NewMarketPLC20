@@ -2,12 +2,13 @@
 Shop management endpoints (seller).
 """
 from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.deps import get_current_seller, get_current_user
 from app.core.database import get_db
-from app.models.models import Shop, SellerRequisites, TaxRegime, User
+from app.models.models import Shop, SellerRequisites, TaxRegime, User, ShopMember, ShopMemberRole
 from app.schemas.schemas import (
     ShopCreate, ShopOut, ShopUpdate,
     ShopCreateWithRequisites, SellerRequisitesCreate, SellerRequisitesOut,
@@ -172,11 +173,144 @@ async def get_my_shop(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_seller),
 ):
-    result = await db.execute(select(Shop).where(Shop.owner_id == current_user.id))
-    shop = result.scalar_one_or_none()
+    # Owners resolve their own shop; staff resolve the shop they belong to.
+    from app.services.shop_membership_service import resolve_shop_id
+    shop_id = await resolve_shop_id(db, current_user)
+    shop = (await db.execute(select(Shop).where(Shop.id == shop_id))).scalar_one_or_none() if shop_id else None
     if not shop:
         raise HTTPException(status_code=404, detail="Shop not found")
     return shop
+
+
+# ─── Shop staff (multi-user accounts) ──────────────────────────────────────────
+
+class ShopMemberIn(BaseModel):
+    email: str
+    role: str = "staff"            # manager | staff
+    permissions: list[str] = []
+
+
+class ShopMemberUpdate(BaseModel):
+    role: str | None = None
+    permissions: list[str] | None = None
+
+
+async def _require_owner(db: AsyncSession, user: User) -> int:
+    from app.services.shop_membership_service import resolve_shop_id, is_owner
+    shop_id = await resolve_shop_id(db, user)
+    if not shop_id or not await is_owner(db, user, shop_id):
+        raise HTTPException(status_code=403, detail="Только владелец магазина может управлять сотрудниками")
+    return shop_id
+
+
+@router.get("/my/staff-catalog")
+async def staff_permission_catalog(_: User = Depends(get_current_seller)):
+    """Grouped shop-staff permissions + which cabinet sections each unlocks."""
+    from app.services.shop_membership_service import SHOP_PERMISSIONS, PERMISSION_GROUPS, menu_for_permission
+    return {
+        "groups": [
+            {"group": g["group"], "permissions": [
+                {"key": k, "description": SHOP_PERMISSIONS[k], "menu": menu_for_permission(k)}
+                for k in g["keys"] if k in SHOP_PERMISSIONS
+            ]}
+            for g in PERMISSION_GROUPS
+        ]
+    }
+
+
+@router.get("/my/access")
+async def my_shop_access(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_seller),
+):
+    """Current user's allowed seller-cabinet paths + effective permissions."""
+    from app.services.shop_membership_service import resolve_shop_id, allowed_seller_paths, shop_permissions, is_owner
+    shop_id = await resolve_shop_id(db, current_user)
+    if not shop_id:
+        return {"paths": [], "permissions": [], "is_owner": False}
+    return {
+        "paths": await allowed_seller_paths(db, current_user, shop_id),
+        "permissions": sorted(await shop_permissions(db, current_user, shop_id)),
+        "is_owner": await is_owner(db, current_user, shop_id),
+    }
+
+
+@router.get("/my/members")
+async def list_members(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_seller),
+):
+    shop_id = await _require_owner(db, current_user)
+    import json
+    rows = (await db.execute(
+        select(ShopMember, User).join(User, User.id == ShopMember.user_id)
+        .where(ShopMember.shop_id == shop_id).order_by(ShopMember.created_at)
+    )).all()
+    return [
+        {"user_id": m.user_id, "email": u.email, "full_name": u.full_name,
+         "role": m.role.value if hasattr(m.role, "value") else m.role,
+         "permissions": (json.loads(m.permissions) if m.permissions else [])}
+        for m, u in rows
+    ]
+
+
+@router.post("/my/members", status_code=201)
+async def add_member(
+    payload: ShopMemberIn,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_seller),
+):
+    from app.services.shop_membership_service import serialize_permissions, get_membership
+    shop_id = await _require_owner(db, current_user)
+    target = (await db.execute(select(User).where(User.email == payload.email))).scalar_one_or_none()
+    if not target:
+        raise HTTPException(status_code=404, detail="Пользователь с таким email не зарегистрирован")
+    if target.id == current_user.id:
+        raise HTTPException(status_code=400, detail="Вы и так владелец магазина")
+    existing = await get_membership(db, target.id, shop_id)
+    if existing:
+        raise HTTPException(status_code=400, detail="Этот пользователь уже сотрудник магазина")
+    role = ShopMemberRole.manager if payload.role == "manager" else ShopMemberRole.staff
+    db.add(ShopMember(
+        shop_id=shop_id, user_id=target.id, role=role,
+        permissions=serialize_permissions(payload.permissions),
+    ))
+    await db.commit()
+    return {"user_id": target.id, "email": target.email}
+
+
+@router.patch("/my/members/{user_id}")
+async def update_member(
+    user_id: int,
+    payload: ShopMemberUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_seller),
+):
+    from app.services.shop_membership_service import serialize_permissions, get_membership
+    shop_id = await _require_owner(db, current_user)
+    member = await get_membership(db, user_id, shop_id)
+    if not member:
+        raise HTTPException(status_code=404, detail="Сотрудник не найден")
+    if payload.role is not None:
+        member.role = ShopMemberRole.manager if payload.role == "manager" else ShopMemberRole.staff
+    if payload.permissions is not None:
+        member.permissions = serialize_permissions(payload.permissions)
+    await db.commit()
+    return {"ok": True}
+
+
+@router.delete("/my/members/{user_id}", status_code=204)
+async def remove_member(
+    user_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_seller),
+):
+    from app.services.shop_membership_service import get_membership
+    shop_id = await _require_owner(db, current_user)
+    member = await get_membership(db, user_id, shop_id)
+    if member:
+        await db.delete(member)
+        await db.commit()
 
 
 @router.put("/my", response_model=ShopOut)

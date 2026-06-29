@@ -223,6 +223,16 @@ export const shopsApi = {
   }) => api.put<Shop>('/shops/my', data).then(r => r.data),
 
   get: (id: number) => api.get<Shop>(`/shops/${id}`).then(r => r.data),
+
+  // Shop staff (multi-user accounts)
+  staffCatalog: () => api.get<any>('/shops/my/staff-catalog').then(r => r.data),
+  myAccess: () => api.get<{ paths: string[]; permissions: string[]; is_owner: boolean }>('/shops/my/access').then(r => r.data),
+  members: () => api.get<any[]>('/shops/my/members').then(r => r.data),
+  addMember: (email: string, role: string, permissions: string[]) =>
+    api.post('/shops/my/members', { email, role, permissions }).then(r => r.data),
+  updateMember: (userId: number, data: { role?: string; permissions?: string[] }) =>
+    api.patch(`/shops/my/members/${userId}`, data).then(r => r.data),
+  removeMember: (userId: number) => api.delete(`/shops/my/members/${userId}`),
 }
 
 // ─── Cart ─────────────────────────────────────────────────────────────────────
