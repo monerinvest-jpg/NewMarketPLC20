@@ -71,6 +71,22 @@ async def _auto_complete_orders_async():
         return len(orders)
 
 
+async def _send_campaign_async(campaign_id: int):
+    from app.models.models import Campaign
+    from app.services.campaign_service import send_campaign
+    async with AsyncSessionLocal() as db:
+        campaign = await db.get(Campaign, campaign_id)
+        if campaign:
+            return await send_campaign(db, campaign)
+        return 0
+
+
+@celery_app.task(name="app.tasks.tasks.send_marketing_campaign")
+def send_marketing_campaign(campaign_id: int):
+    """Deliver a marketing campaign to its segment (email or in-app)."""
+    return asyncio.run(_send_campaign_async(campaign_id))
+
+
 @celery_app.task(name="app.tasks.tasks.auto_mark_delivered")
 def auto_mark_delivered():
     """Mark shipped orders as delivered after configured number of days."""

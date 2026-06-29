@@ -200,6 +200,25 @@ async def update_profile(
     return current_user
 
 
+@users_router.get("/unsubscribe")
+async def unsubscribe_from_marketing(token: str, db: AsyncSession = Depends(get_db)):
+    """One-click marketing unsubscribe (HMAC-signed token from campaign emails)."""
+    from fastapi.responses import HTMLResponse
+    from app.services.campaign_service import verify_unsub_token
+    uid = verify_unsub_token(token)
+    if uid:
+        user = (await db.execute(select(User).where(User.id == uid))).scalar_one_or_none()
+        if user:
+            user.marketing_opt_out = True
+            await db.commit()
+    html = (
+        "<html><body style='font-family:sans-serif;text-align:center;padding:60px;background:#f7f1e8'>"
+        "<h2 style='color:#7c4a21'>Вы отписались от рассылки</h2>"
+        "<p>Больше мы не будем присылать вам маркетинговые письма.</p></body></html>"
+    )
+    return HTMLResponse(html)
+
+
 @users_router.get("/me/referral-stats")
 async def get_referral_stats(
     db: AsyncSession = Depends(get_db),

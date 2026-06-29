@@ -598,6 +598,85 @@ async def review_verification(
     return {"status": rec.status.value if hasattr(rec.status, "value") else rec.status}
 
 
+# ─── Marketing campaigns (email / in-app broadcasts) ───────────────────────────
+
+@router.get("/campaigns")
+async def list_campaigns(
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_moderator_or_admin),
+):
+    from app.models.models import Campaign
+    rows = (await db.execute(select(Campaign).order_by(Campaign.created_at.desc()))).scalars().all()
+    return [
+        {"id": c.id, "title": c.title, "channel": c.channel.value if hasattr(c.channel, "value") else c.channel,
+         "subject": c.subject, "status": c.status.value if hasattr(c.status, "value") else c.status,
+         "recipients": c.recipients, "sent_count": c.sent_count,
+         "created_at": c.created_at.isoformat(), "sent_at": c.sent_at.isoformat() if c.sent_at else None}
+        for c in rows
+    ]
+
+
+@router.post("/campaigns/preview")
+async def preview_campaign_segment(
+    payload: dict,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_moderator_or_admin),
+):
+    from app.services.campaign_service import preview_count
+    return {"count": await preview_count(db, payload.get("segment") or {})}
+
+
+@router.post("/campaigns", status_code=201)
+async def create_campaign(
+    payload: dict,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_moderator_or_admin),
+):
+    import json
+    from app.models.models import Campaign, CampaignChannel
+    from app.services.campaign_service import preview_count
+    if not payload.get("title") or not payload.get("body"):
+        raise HTTPException(status_code=400, detail="Заполните название и текст")
+    seg = payload.get("segment") or {}
+    channel = CampaignChannel.inapp if payload.get("channel") == "inapp" else CampaignChannel.email
+    camp = Campaign(
+        title=payload["title"], channel=channel, subject=payload.get("subject"),
+        body=payload["body"], link=payload.get("link"),
+        segment=json.dumps(seg), recipients=await preview_count(db, seg),
+        created_by_id=current_user.id,
+    )
+    db.add(camp)
+    await db.commit()
+    await db.refresh(camp)
+    return {"id": camp.id, "recipients": camp.recipients}
+
+
+@router.post("/campaigns/{campaign_id}/send")
+async def send_campaign_now(
+    campaign_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_moderator_or_admin),
+):
+    from app.models.models import Campaign, CampaignStatus
+    from app.services.audit_service import log_action
+    camp = await db.get(Campaign, campaign_id)
+    if not camp:
+        raise HTTPException(status_code=404, detail="Кампания не найдена")
+    if camp.status == CampaignStatus.sending:
+        raise HTTPException(status_code=400, detail="Кампания уже отправляется")
+    camp.status = CampaignStatus.sending
+    await log_action(db, current_user.id, "campaign.send", "campaign", camp.id, detail=camp.title)
+    await db.commit()
+    # Offload to Celery; fall back to inline send if the broker is unavailable.
+    try:
+        from app.tasks.tasks import send_marketing_campaign
+        send_marketing_campaign.delay(camp.id)
+    except Exception:  # noqa: BLE001
+        from app.services.campaign_service import send_campaign
+        await send_campaign(db, camp)
+    return {"status": "sending"}
+
+
 # ─── Products (moderation) ────────────────────────────────────────────────────
 
 @router.get("/products", response_model=dict)

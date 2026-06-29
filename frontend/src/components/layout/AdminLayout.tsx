@@ -57,6 +57,7 @@ const groups = [
   {
     key: 'grp-marketing', icon: <NotificationOutlined />, label: 'Маркетинг',
     children: [
+      { key: '/admin/campaigns', icon: <NotificationOutlined />, label: 'Рассылки' },
       { key: '/admin/coupons', icon: <GiftOutlined />, label: 'Купоны' },
       { key: '/admin/banners', icon: <PictureOutlined />, label: 'Баннеры' },
       { key: '/admin/gift-certificates', icon: <GiftOutlined />, label: 'Сертификаты' },

@@ -375,6 +375,11 @@ export const adminApi = {
     api.get<any[]>('/admin/verifications', { params: { status } }).then(r => r.data),
   reviewVerification: (shopId: number, approve: boolean, reason?: string) =>
     api.post(`/admin/verifications/${shopId}/review`, { approve, reason }).then(r => r.data),
+  // Marketing campaigns
+  listCampaigns: () => api.get<any[]>('/admin/campaigns').then(r => r.data),
+  previewSegment: (segment: any) => api.post<{ count: number }>('/admin/campaigns/preview', { segment }).then(r => r.data),
+  createCampaign: (data: any) => api.post('/admin/campaigns', data).then(r => r.data),
+  sendCampaign: (id: number) => api.post(`/admin/campaigns/${id}/send`).then(r => r.data),
   // Block D: SMS (SMSC.ru) section
   smsStatus: () => api.get<any>('/admin/sms/status').then(r => r.data),
   smsUpdateSettings: (data: Record<string, any>) =>

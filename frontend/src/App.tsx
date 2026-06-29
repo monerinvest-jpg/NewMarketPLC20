@@ -100,6 +100,7 @@ const SellerRequisitesPage = lazy(() => import('./pages/seller/SellerRequisitesP
 const SellerStaff = lazy(() => import('./pages/seller/SellerStaff'))
 const SellerTrust = lazy(() => import('./pages/seller/SellerTrust'))
 const AdminVerifications = lazy(() => import('./pages/admin/AdminVerifications'))
+const AdminCampaigns = lazy(() => import('./pages/admin/AdminCampaigns'))
 
 // Craft / wood theme: warm amber-terracotta accents on parchment, walnut text,
 // softer radii. Evokes handmade goods rather than a cold marketplace.
@@ -228,6 +229,7 @@ function App() {
               <Route path="shops" element={<AdminShops />} />
               <Route path="shops/:id" element={<AdminShopDetail />} />
               <Route path="verifications" element={<AdminVerifications />} />
+              <Route path="campaigns" element={<AdminCampaigns />} />
               <Route path="products" element={<AdminProducts />} />
               <Route path="orders" element={<AdminOrders />} />
               <Route path="categories" element={<AdminCategories />} />

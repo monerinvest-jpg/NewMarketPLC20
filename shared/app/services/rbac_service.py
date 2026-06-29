@@ -48,6 +48,7 @@ MENU_ITEMS = [
     ("/admin/orders", "Заказы", "orders.manage"),
     ("/admin/payouts", "Выводы средств", "payouts.process"),
     ("/admin/fiscal-receipts", "Фискальные чеки", "orders.manage"),
+    ("/admin/campaigns", "Рассылки", "marketing.manage"),
     ("/admin/coupons", "Купоны", "marketing.manage"),
     ("/admin/banners", "Баннеры", "marketing.manage"),
     ("/admin/gift-certificates", "Сертификаты", "marketing.manage"),

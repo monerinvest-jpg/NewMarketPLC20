@@ -318,6 +318,8 @@ class User(Base):
     # confirmed (only when SMS is enabled in admin).
     email_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     phone_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    # Marketing consent: when True the user is excluded from email/push campaigns.
+    marketing_opt_out: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default="false")
     # Two-factor authentication (TOTP). Secret is set when 2FA is enabled.
     totp_secret: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     is_2fa_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
@@ -434,6 +436,37 @@ class SellerVerification(Base):
     reviewed_by_id: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("user.id"), nullable=True)
     submitted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
     reviewed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class CampaignChannel(str, enum.Enum):
+    email = "email"
+    inapp = "inapp"    # in-app notification (and push, if configured)
+
+
+class CampaignStatus(str, enum.Enum):
+    draft = "draft"
+    sending = "sending"
+    sent = "sent"
+    failed = "failed"
+
+
+class Campaign(Base):
+    """A marketing broadcast to a user segment over email or in-app notifications."""
+    __tablename__ = "campaign"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    channel: Mapped[CampaignChannel] = mapped_column(Enum(CampaignChannel), default=CampaignChannel.email, nullable=False)
+    subject: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    link: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
+    segment: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # JSON filter
+    status: Mapped[CampaignStatus] = mapped_column(Enum(CampaignStatus), default=CampaignStatus.draft, nullable=False)
+    recipients: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    sent_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    created_by_id: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("user.id"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+    sent_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class Category(Base):
