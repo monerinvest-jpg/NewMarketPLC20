@@ -140,6 +140,151 @@ async def update_user(
     return user
 
 
+@router.get("/users/{user_id}")
+async def user_detail(
+    user_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_moderator_or_admin),
+):
+    """
+    Full 360° view of a user for moderation / payout fraud review: profile,
+    every balance, withdrawal requisites, lifetime stats, recent orders, payouts,
+    balance ledger, referrals they made, recent staff actions, and risk flags.
+    """
+    from datetime import datetime, timedelta, timezone
+    from app.models.models import (
+        Order, PayoutRequest, Referral, ReferralReward, BalanceTransaction,
+        AuditLog, WithdrawalAccount, Shop,
+    )
+
+    user = (await db.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+
+    def _sum(v) -> Decimal:
+        return Decimal(str(v or 0))
+
+    # Orders placed as a buyer
+    orders_count = (await db.execute(
+        select(func.count(Order.id)).where(Order.buyer_id == user_id)
+    )).scalar_one()
+    orders_total = _sum((await db.execute(
+        select(func.sum(Order.total_price)).where(
+            Order.buyer_id == user_id,
+            Order.status.notin_(["pending_payment", "cancelled", "refunded"]),
+        )
+    )).scalar_one())
+    recent_orders = (await db.execute(
+        select(Order).where(Order.buyer_id == user_id).order_by(Order.created_at.desc()).limit(10)
+    )).scalars().all()
+
+    # Payouts (both sales and referral)
+    payouts = (await db.execute(
+        select(PayoutRequest).where(PayoutRequest.user_id == user_id)
+        .order_by(PayoutRequest.created_at.desc()).limit(20)
+    )).scalars().all()
+    payouts_paid = _sum((await db.execute(
+        select(func.sum(PayoutRequest.amount)).where(
+            PayoutRequest.user_id == user_id, PayoutRequest.status == "paid")
+    )).scalar_one())
+    payouts_pending = _sum((await db.execute(
+        select(func.sum(PayoutRequest.amount)).where(
+            PayoutRequest.user_id == user_id, PayoutRequest.status.in_(["pending", "approved"]))
+    )).scalar_one())
+    ref_payouts_total = _sum((await db.execute(
+        select(func.sum(PayoutRequest.amount)).where(
+            PayoutRequest.user_id == user_id, PayoutRequest.source == "referral",
+            PayoutRequest.status.in_(["pending", "approved", "paid"]))
+    )).scalar_one())
+
+    # Referrals this user made + lifetime referral earnings
+    referrals_made = (await db.execute(
+        select(func.count(Referral.id)).where(Referral.referrer_id == user_id)
+    )).scalar_one()
+    referrals_recent_7d = (await db.execute(
+        select(func.count(Referral.id)).where(
+            Referral.referrer_id == user_id,
+            Referral.created_at >= datetime.now(timezone.utc) - timedelta(days=7),
+        )
+    )).scalar_one()
+    referral_earned = _sum((await db.execute(
+        select(func.sum(ReferralReward.amount)).select_from(ReferralReward)
+        .join(Referral, Referral.id == ReferralReward.referral_id)
+        .where(Referral.referrer_id == user_id)
+    )).scalar_one())
+
+    txns = (await db.execute(
+        select(BalanceTransaction).where(BalanceTransaction.user_id == user_id)
+        .order_by(BalanceTransaction.created_at.desc()).limit(20)
+    )).scalars().all()
+    actions = (await db.execute(
+        select(AuditLog).where(AuditLog.actor_id == user_id)
+        .order_by(AuditLog.created_at.desc()).limit(20)
+    )).scalars().all()
+
+    withdrawal_acc = (await db.execute(
+        select(WithdrawalAccount).where(WithdrawalAccount.user_id == user_id)
+    )).scalar_one_or_none()
+    shop = (await db.execute(select(Shop).where(Shop.owner_id == user_id))).scalar_one_or_none()
+
+    # ── Risk flags ────────────────────────────────────────────────────────────
+    created = user.created_at
+    now = datetime.now(timezone.utc)
+    age_days = (now - created).days if created else 999
+    has_pending = payouts_pending > 0
+    flags: list[str] = []
+    if has_pending and not user.email_verified:
+        flags.append("Заявка на вывод при неподтверждённом email")
+    if has_pending and age_days < 14:
+        flags.append(f"Молодой аккаунт ({age_days} дн.) с заявкой на вывод")
+    if ref_payouts_total > referral_earned:
+        flags.append("Сумма реферальных выводов превышает начисленный реферальный доход")
+    if referrals_recent_7d >= 20:
+        flags.append(f"Высокая скорость приглашений: {referrals_recent_7d} за 7 дней")
+    if has_pending and withdrawal_acc is None:
+        flags.append("Заявка на вывод без сохранённых реквизитов")
+
+    return {
+        "user": UserOut.model_validate(user),
+        "shop_id": shop.id if shop else None,
+        "withdrawal_account": None if not withdrawal_acc else {
+            "tax_regime": withdrawal_acc.tax_regime.value,
+            "legal_name": withdrawal_acc.legal_name,
+            "inn": withdrawal_acc.inn,
+            "account_details": withdrawal_acc.account_details,
+        },
+        "stats": {
+            "account_age_days": age_days,
+            "orders_count": orders_count,
+            "orders_total_spent": orders_total,
+            "referrals_made": referrals_made,
+            "referral_earned_total": referral_earned,
+            "payouts_paid_total": payouts_paid,
+            "payouts_pending_total": payouts_pending,
+        },
+        "risk_flags": flags,
+        "recent_orders": [
+            {"id": o.id, "total_price": o.total_price, "status": str(o.status.value if hasattr(o.status, "value") else o.status),
+             "created_at": o.created_at.isoformat()} for o in recent_orders
+        ],
+        "payouts": [
+            {"id": p.id, "amount": p.amount,
+             "source": str(p.source.value if hasattr(p.source, "value") else p.source),
+             "status": str(p.status.value if hasattr(p.status, "value") else p.status),
+             "created_at": p.created_at.isoformat()} for p in payouts
+        ],
+        "balance_transactions": [
+            {"change": t.change, "type": str(t.type.value if hasattr(t.type, "value") else t.type),
+             "reference_type": t.reference_type, "description": t.description,
+             "created_at": t.created_at.isoformat()} for t in txns
+        ],
+        "recent_actions": [
+            {"action": a.action, "entity_type": a.entity_type, "entity_id": a.entity_id,
+             "detail": a.detail, "created_at": a.created_at.isoformat()} for a in actions
+        ],
+    }
+
+
 # ─── Shops ────────────────────────────────────────────────────────────────────
 
 @router.get("/shops", response_model=dict)
@@ -252,6 +397,84 @@ async def get_shop_requisites(
         "bank_name": req.bank_name,
         "bik": req.bik,
         "corr_account": req.corr_account,
+    }
+
+
+@router.get("/shops/{shop_id}/detail")
+async def shop_detail(
+    shop_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_moderator_or_admin),
+):
+    """360° view of a shop: owner, lifetime sales/fees/net, payouts, product
+    counts and recent orders containing this shop's items."""
+    from app.models.models import Order, OrderItem, PayoutRequest
+
+    shop = (await db.execute(select(Shop).where(Shop.id == shop_id))).scalar_one_or_none()
+    if not shop:
+        raise HTTPException(status_code=404, detail="Магазин не найден")
+
+    def _sum(v) -> Decimal:
+        return Decimal(str(v or 0))
+
+    owner = (await db.execute(select(User).where(User.id == shop.owner_id))).scalar_one_or_none()
+
+    products_count = (await db.execute(
+        select(func.count(Product.id)).where(Product.shop_id == shop_id)
+    )).scalar_one()
+
+    # Lifetime financials from this shop's order items (multi-shop safe).
+    gross = _sum((await db.execute(
+        select(func.sum(OrderItem.price_at_time * OrderItem.quantity)).where(OrderItem.shop_id == shop_id)
+    )).scalar_one())
+    fees = _sum((await db.execute(
+        select(func.sum(OrderItem.platform_fee)).where(OrderItem.shop_id == shop_id)
+    )).scalar_one())
+    net = _sum((await db.execute(
+        select(func.sum(OrderItem.seller_net)).where(OrderItem.shop_id == shop_id)
+    )).scalar_one())
+    orders_count = (await db.execute(
+        select(func.count(func.distinct(OrderItem.order_id))).where(OrderItem.shop_id == shop_id)
+    )).scalar_one()
+
+    payouts_paid = _sum((await db.execute(
+        select(func.sum(PayoutRequest.amount)).where(
+            PayoutRequest.user_id == shop.owner_id,
+            PayoutRequest.source == "sales", PayoutRequest.status == "paid")
+    )).scalar_one())
+
+    recent_order_ids = [row[0] for row in (await db.execute(
+        select(OrderItem.order_id).where(OrderItem.shop_id == shop_id)
+        .distinct().order_by(OrderItem.order_id.desc()).limit(10)
+    )).all()]
+    recent_orders = []
+    if recent_order_ids:
+        rows = (await db.execute(
+            select(Order).where(Order.id.in_(recent_order_ids)).order_by(Order.created_at.desc())
+        )).scalars().all()
+        recent_orders = [
+            {"id": o.id, "total_price": o.total_price,
+             "status": str(o.status.value if hasattr(o.status, "value") else o.status),
+             "created_at": o.created_at.isoformat()} for o in rows
+        ]
+
+    return {
+        "shop": ShopOut.model_validate(shop),
+        "owner": None if not owner else {
+            "id": owner.id, "email": owner.email, "full_name": owner.full_name,
+            "role": owner.role.value if hasattr(owner.role, "value") else owner.role,
+            "balance": owner.balance,
+        },
+        "stats": {
+            "products_count": products_count,
+            "orders_count": orders_count,
+            "gross_sales": gross,
+            "platform_fees": fees,
+            "seller_net": net,
+            "payouts_paid": payouts_paid,
+            "owed_balance": owner.balance if owner else Decimal("0"),
+        },
+        "recent_orders": recent_orders,
     }
 
 
@@ -1186,12 +1409,23 @@ async def list_payout_requests(
     status_filter: Optional[str] = Query(None, alias="status"),
 ):
     from app.models.models import PayoutRequest
-    from app.schemas.schemas import PayoutRequestOut
-    query = select(PayoutRequest).order_by(PayoutRequest.created_at.desc())
+    query = select(PayoutRequest, User).join(User, User.id == PayoutRequest.user_id).order_by(PayoutRequest.created_at.desc())
     if status_filter:
         query = query.where(PayoutRequest.status == status_filter)
-    result = await db.execute(query)
-    return [PayoutRequestOut.model_validate(p) for p in result.scalars().all()]
+    rows = (await db.execute(query)).all()
+    return [
+        {
+            "id": p.id, "user_id": p.user_id, "amount": p.amount,
+            "source": p.source.value if hasattr(p.source, "value") else p.source,
+            "status": p.status.value if hasattr(p.status, "value") else p.status,
+            "payout_details": p.payout_details, "admin_comment": p.admin_comment,
+            "created_at": p.created_at.isoformat(),
+            "processed_at": p.processed_at.isoformat() if p.processed_at else None,
+            "user_email": u.email, "user_name": u.full_name,
+            "user_email_verified": u.email_verified,
+        }
+        for p, u in rows
+    ]
 
 
 @router.post("/payouts/{payout_id}/process")
@@ -1441,12 +1675,60 @@ async def platform_analytics(
     )
     user_growth = [{"day": str(r.day), "count": r.count} for r in new_users]
 
+    # ── Financial summary: payouts, liabilities, referral cost, net profit ──────
+    from app.models.models import PayoutRequest, ReferralReward, UserRole
+
+    def _f(v) -> float:
+        return float(v or 0)
+
+    payouts_paid = _f((await db.execute(
+        select(func.sum(PayoutRequest.amount)).where(PayoutRequest.status == "paid")
+    )).scalar_one())
+    payouts_pending = _f((await db.execute(
+        select(func.sum(PayoutRequest.amount)).where(PayoutRequest.status.in_(["pending", "approved"]))
+    )).scalar_one())
+    ref_payouts_paid = _f((await db.execute(
+        select(func.sum(PayoutRequest.amount)).where(
+            PayoutRequest.status == "paid", PayoutRequest.source == "referral")
+    )).scalar_one())
+    referral_cost = _f((await db.execute(
+        select(func.sum(ReferralReward.amount))
+    )).scalar_one())
+
+    # Outstanding liabilities owed to users (money we still hold on their balances)
+    seller_balance_liab = _f((await db.execute(
+        select(func.sum(User.balance))
+    )).scalar_one())
+    referral_balance_liab = _f((await db.execute(
+        select(func.sum(User.referral_balance))
+    )).scalar_one())
+    bonus_liab = _f((await db.execute(
+        select(func.sum(User.bonus_balance))
+    )).scalar_one())
+
+    # Net platform profit ≈ commission earned − referral programme cost.
+    net_profit = round(platform_revenue - referral_cost, 2)
+
     return {
         "gmv": gmv,
         "platform_revenue": platform_revenue,
         "trend": trend,
         "top_shops": shops,
         "user_growth": user_growth,
+        "finance": {
+            "platform_commission": round(platform_revenue, 2),
+            "referral_cost": round(referral_cost, 2),
+            "net_profit": net_profit,
+            "payouts_paid": round(payouts_paid, 2),
+            "payouts_pending": round(payouts_pending, 2),
+            "referral_payouts_paid": round(ref_payouts_paid, 2),
+            "liabilities": {
+                "seller_balances": round(seller_balance_liab, 2),
+                "referral_balances": round(referral_balance_liab, 2),
+                "bonus_balances": round(bonus_liab, 2),
+                "pending_payouts": round(payouts_pending, 2),
+            },
+        },
     }
 
 

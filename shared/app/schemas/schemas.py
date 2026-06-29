@@ -86,6 +86,8 @@ class UserOut(OrmBase):
     referral_code: Optional[str]
     balance: Decimal
     bonus_balance: Decimal
+    referral_balance: Decimal = Decimal("0")
+    promo_balance: Decimal = Decimal("0")
     is_active: bool
     is_staff: bool
     is_superuser: bool
