@@ -52,6 +52,26 @@ class ProductStatus(str, enum.Enum):
     blocked = "blocked"
 
 
+class ProductType(str, enum.Enum):
+    """What kind of product this is, which drives fulfillment.
+
+    physical — shippable goods (stock, weight, delivery, sub-orders);
+    digital  — a downloadable file delivered instantly after payment;
+    course   — access to an on-platform learning course (LMS).
+    """
+    physical = "physical"
+    digital = "digital"
+    course = "course"
+
+
+class CategoryKind(str, enum.Enum):
+    """Optional hint on a category subtree so the seller product form and the
+    storefront know what kind of products live under it. Null = generic."""
+    physical = "physical"
+    digital = "digital"
+    course = "course"
+
+
 class ShopStatus(str, enum.Enum):
     """Moderation lifecycle of a seller's shop."""
     pending = "pending"
@@ -356,6 +376,8 @@ class Category(Base):
     slug: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
     image: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
     sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    # Optional kind hint for the subtree (physical/digital/course); null = generic.
+    kind: Mapped[Optional[CategoryKind]] = mapped_column(Enum(CategoryKind), nullable=True)
 
     parent: Mapped[Optional["Category"]] = relationship("Category", remote_side="Category.id", back_populates="children")
     children: Mapped[List["Category"]] = relationship("Category", back_populates="parent")
@@ -376,6 +398,12 @@ class Product(Base):
     compare_at_price: Mapped[Optional[Decimal]] = mapped_column(Numeric(12, 2), nullable=True)
     quantity: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     weight_g: Mapped[int] = mapped_column(Integer, default=500, nullable=False)  # weight in grams for shipping
+    # Fulfillment kind. physical (default) ships and tracks stock; digital is
+    # delivered instantly as a file; course grants LMS access. For digital/course
+    # the quantity/weight/delivery fields are ignored (unlimited stock).
+    product_type: Mapped[ProductType] = mapped_column(
+        Enum(ProductType), default=ProductType.physical, nullable=False, server_default="physical"
+    )
     status: Mapped[ProductStatus] = mapped_column(Enum(ProductStatus), default=ProductStatus.pending, nullable=False)
     moderation_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     rating: Mapped[Decimal] = mapped_column(Numeric(3, 2), default=Decimal("0.00"), nullable=False)
@@ -394,6 +422,7 @@ class Product(Base):
     variants: Mapped[List["ProductVariant"]] = relationship("ProductVariant", back_populates="product", cascade="all, delete-orphan")
     attribute_values: Mapped[List["ProductAttributeValue"]] = relationship("ProductAttributeValue", back_populates="product", cascade="all, delete-orphan")
     questions: Mapped[List["ProductQuestion"]] = relationship("ProductQuestion", back_populates="product", cascade="all, delete-orphan")
+    digital_assets: Mapped[List["DigitalAsset"]] = relationship("DigitalAsset", back_populates="product", cascade="all, delete-orphan")
 
     __table_args__ = (
         Index("ix_product_shop_id", "shop_id"),
@@ -439,6 +468,61 @@ class ProductImage(Base):
 
     __table_args__ = (
         Index("ix_product_image_product_id", "product_id"),
+    )
+
+
+class DigitalAsset(Base):
+    """A downloadable file belonging to a digital product.
+
+    Files are stored PRIVATELY (object-storage key or a non-public local path),
+    never under the public /uploads mount. Entitled buyers receive a short-lived
+    signed URL (or a streamed response) instead of a permanent link.
+    """
+    __tablename__ = "digital_asset"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    product_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("product.id"), nullable=False)
+    file_name: Mapped[str] = mapped_column(String(255), nullable=False)        # original name shown to buyer
+    storage_key: Mapped[str] = mapped_column(String(512), nullable=False)      # private key/path, NOT a public URL
+    content_type: Mapped[str] = mapped_column(String(120), nullable=False, server_default="application/octet-stream")
+    size_bytes: Mapped[int] = mapped_column(BigInteger, default=0, nullable=False)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+
+    product: Mapped["Product"] = relationship("Product", back_populates="digital_assets")
+
+    __table_args__ = (
+        Index("ix_digital_asset_product_id", "product_id"),
+    )
+
+
+class Entitlement(Base):
+    """A buyer's right to access a digital product (or course) after purchase.
+
+    Granted when the order's payment succeeds; checked on every download/stream.
+    Unique per (user, product, order) so re-delivery of a payment webhook never
+    creates duplicate grants. `revoked` is set on refund/chargeback.
+    """
+    __tablename__ = "entitlement"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("user.id"), nullable=False)
+    product_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("product.id"), nullable=False)
+    order_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("order.id"), nullable=False)
+    order_item_id: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("order_item.id"), nullable=True)
+    granted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+    revoked: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    download_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    last_downloaded_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    user: Mapped["User"] = relationship("User")
+    product: Mapped["Product"] = relationship("Product")
+    order: Mapped["Order"] = relationship("Order")
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "product_id", "order_id", name="uq_entitlement_user_product_order"),
+        Index("ix_entitlement_user_id", "user_id"),
+        Index("ix_entitlement_product_id", "product_id"),
     )
 
 

@@ -24,6 +24,7 @@ const OrderDetailPage = lazy(() => import('./pages/buyer/OrderDetailPage'))
 const FavoritesPage = lazy(() => import('./pages/buyer/FavoritesPage'))
 const ProfilePage = lazy(() => import('./pages/buyer/ProfilePage'))
 const ReferralPage = lazy(() => import('./pages/buyer/ReferralPage'))
+const MyDownloadsPage = lazy(() => import('./pages/buyer/MyDownloadsPage'))
 
 // Seller pages
 const SellerDashboard = lazy(() => import('./pages/seller/SellerDashboard'))
@@ -129,6 +130,7 @@ function App() {
                 <Route path="/checkout" element={<CheckoutPage />} />
                 <Route path="/orders" element={<OrdersPage />} />
                 <Route path="/orders/:id" element={<OrderDetailPage />} />
+                <Route path="/my/downloads" element={<MyDownloadsPage />} />
                 <Route path="/favorites" element={<FavoritesPage />} />
                 <Route path="/profile" element={<ProfilePage />} />
                 <Route path="/referral" element={<ReferralPage />} />

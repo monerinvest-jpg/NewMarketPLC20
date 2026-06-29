@@ -91,6 +91,9 @@ export interface DeliveryQuote {
   estimated_days: number
 }
 
+export type ProductType = 'physical' | 'digital' | 'course'
+export type CategoryKind = 'physical' | 'digital' | 'course'
+
 export interface Category {
   id: number
   parent_id?: number
@@ -98,6 +101,7 @@ export interface Category {
   slug: string
   image?: string
   sort_order: number
+  kind?: CategoryKind | null
   children: Category[]
 }
 
@@ -106,6 +110,33 @@ export interface ProductImage {
   url: string
   is_main: boolean
   sort_order: number
+}
+
+export interface DigitalAsset {
+  id: number
+  file_name: string
+  content_type: string
+  size_bytes: number
+  sort_order: number
+}
+
+export interface EntitlementFile {
+  asset_id: number
+  file_name: string
+  content_type: string
+  size_bytes: number
+}
+
+export interface Entitlement {
+  id: number
+  product_id: number
+  product_title: string
+  product_slug?: string
+  order_id: number
+  granted_at: string
+  revoked: boolean
+  download_count: number
+  files: EntitlementFile[]
 }
 
 export interface Product {
@@ -118,6 +149,7 @@ export interface Product {
   compare_at_price?: string
   quantity: number
   weight_g: number
+  product_type?: ProductType
   status: ProductStatus
   moderation_reason?: string
   rating: string

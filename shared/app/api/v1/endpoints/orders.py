@@ -15,7 +15,7 @@ from app.core.config import settings
 from app.core.database import get_db
 from app.models.models import (
     CartItem, Coupon, DeliveryInfo, FiscalReceipt, FiscalReceiptType, Order, OrderItem,
-    OrderStatus, Payment, PaymentGateway, PaymentStatus, Product, ProductStatus,
+    OrderStatus, Payment, PaymentGateway, PaymentStatus, Product, ProductStatus, ProductType,
     Shop, User, BalanceTransaction, BalanceTransactionType,
 )
 from app.schemas.schemas import FiscalReceiptOut, OrderCreate, OrderOut, OrderStatusUpdate
@@ -65,17 +65,19 @@ async def create_order(
         if product.status != ProductStatus.active:
             raise HTTPException(status_code=400, detail=f"Product '{product.title}' is not available")
 
-        # When the line references a variant, its own price and stock take
-        # precedence over the product's base price/quantity.
+        # Digital/course products have unlimited stock — only physical goods are
+        # stock-checked. When the line references a variant, its own price and
+        # stock take precedence over the product's base price/quantity.
+        is_phys = product.product_type == ProductType.physical
         if variant is not None:
-            if variant.quantity < item.quantity:
+            if is_phys and variant.quantity < item.quantity:
                 raise HTTPException(
                     status_code=400,
                     detail=f"Недостаточно товара варианта '{variant.name}': запрошено {item.quantity}, в наличии {variant.quantity}",
                 )
             unit_price = variant.price if variant.price is not None else product.price
         else:
-            if product.quantity < item.quantity:
+            if is_phys and product.quantity < item.quantity:
                 raise HTTPException(
                     status_code=400,
                     detail=f"Not enough stock for '{product.title}': requested {item.quantity}, available {product.quantity}",
@@ -99,18 +101,25 @@ async def create_order(
     for shop_id, shop in shops.items():
         commission_by_shop[shop_id] = await get_effective_commission(db, shop)
 
-    # 4. Calculate delivery cost
-    delivery_gw = get_delivery_gateway(payload.delivery_service)
-    total_weight = sum(
-        item["product"].weight_g * item["quantity"] for item in order_items_data
+    # 4. Calculate delivery cost. Digital/course-only orders never ship, so
+    # delivery is skipped entirely (cost 0, no DeliveryInfo).
+    has_physical = any(
+        d["product"].product_type == ProductType.physical for d in order_items_data
     )
-    rate = await delivery_gw.calculate_rate("Москва", payload.city_to, total_weight)
-    delivery_cost = rate.cost
+    delivery_cost = Decimal("0.00")
+    rate = None
+    if has_physical:
+        delivery_gw = get_delivery_gateway(payload.delivery_service)
+        total_weight = sum(
+            item["product"].weight_g * item["quantity"] for item in order_items_data
+        )
+        rate = await delivery_gw.calculate_rate("Москва", payload.city_to, total_weight)
+        delivery_cost = rate.cost
 
-    # Loyalty perk: free shipping for eligible tiers.
-    from app.services import loyalty_tier_service
-    if await loyalty_tier_service.has_free_shipping(db, current_user):
-        delivery_cost = Decimal("0.00")
+        # Loyalty perk: free shipping for eligible tiers.
+        from app.services import loyalty_tier_service
+        if await loyalty_tier_service.has_free_shipping(db, current_user):
+            delivery_cost = Decimal("0.00")
 
     # 5. Validate and apply coupon
     coupon_discount = Decimal("0")
@@ -245,16 +254,18 @@ async def create_order(
             payout_status="pending",
         )
         db.add(oi)
-        # Atomically lock the row, re-validate availability and decrement —
-        # this is the authoritative stock check (the loop at step 2 is only a
-        # fast pre-flight and is not race-safe on its own).
-        try:
-            await reserve_stock(
-                db, item_data["product"].id, item_data["quantity"],
-                variant_id=variant.id if variant else None,
-            )
-        except ValueError as exc:
-            raise HTTPException(status_code=409, detail=str(exc))
+        # Only physical goods reserve stock. Digital/course items are unlimited.
+        if item_data["product"].product_type == ProductType.physical:
+            # Atomically lock the row, re-validate availability and decrement —
+            # this is the authoritative stock check (the loop at step 2 is only a
+            # fast pre-flight and is not race-safe on its own).
+            try:
+                await reserve_stock(
+                    db, item_data["product"].id, item_data["quantity"],
+                    variant_id=variant.id if variant else None,
+                )
+            except ValueError as exc:
+                raise HTTPException(status_code=409, detail=str(exc))
 
     await db.flush()
 
@@ -263,17 +274,18 @@ async def create_order(
     from app.services.suborder_service import create_sub_orders_for_order
     await create_sub_orders_for_order(order, db)
 
-    # 10. Create delivery info
-    delivery = DeliveryInfo(
-        order_id=order.id,
-        delivery_service=rate.service,
-        cost=delivery_cost,
-        estimated_days=rate.estimated_days,
-        city_from="Москва",
-        city_to=payload.city_to,
-        address=payload.delivery_address,
-    )
-    db.add(delivery)
+    # 10. Create delivery info (only for orders that actually ship)
+    if has_physical and rate is not None:
+        delivery = DeliveryInfo(
+            order_id=order.id,
+            delivery_service=rate.service,
+            cost=delivery_cost,
+            estimated_days=rate.estimated_days,
+            city_from="Москва",
+            city_to=payload.city_to,
+            address=payload.delivery_address,
+        )
+        db.add(delivery)
 
     # 11. Deduct bonus from buyer
     if bonus_to_use > 0:
@@ -740,6 +752,27 @@ async def yookassa_webhook(request: Request, db: AsyncSession = Depends(get_db))
         )).scalars().all()
         for fr in income_receipts:
             fiscal_service.apply_registration(fr, registration, raw=obj)
+
+        # Digital fulfillment: grant access immediately on payment. If the order
+        # is digital-only (nothing to ship), complete it now so the seller is paid
+        # and the buyer can download right away.
+        from app.services import entitlement_service
+        await entitlement_service.grant_for_order(db, order)
+        if entitlement_service.order_is_digital_only(order):
+            order.status = OrderStatus.completed
+            await payout_sellers_for_order(order, db)
+            await process_buyer_referral_reward(order, db)
+            await process_seller_referral_reward(order, db)
+            from app.services.loyalty_service import award_cashback_for_order
+            await award_cashback_for_order(order, db)
+            from app.services.notification_service import notify as _notify_ready
+            from app.models.models import NotificationType as _NT_ready
+            await _notify_ready(
+                db, order.buyer_id, _NT_ready.order_status,
+                title="Покупка готова",
+                body=f"Заказ #{order.id}: цифровые товары доступны в разделе «Мои покупки»",
+                link="/my/downloads",
+            )
     elif yoo_status in ("cancelled", "refunded"):
         # Idempotency: skip if this order was already cancelled — either by a
         # prior delivery of this same webhook, or by a manual cancel (which

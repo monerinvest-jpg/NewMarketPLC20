@@ -15,6 +15,7 @@ import type {
   PaidFeature, Promotion, AuctionStanding, AdWallet,
   PromoRule, Bundle, ProductBundle, CartPromoSummary,
   Dispute, DisputeMessage, GiftCertificate, PromoOverview, LoyaltyTier, LoyaltyStatus,
+  DigitalAsset, Entitlement,
 } from '@/types'
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
@@ -78,12 +79,14 @@ export const productsApi = {
 
   create: (data: {
     category_id: number; title: string; description?: string;
-    price: number; compare_at_price?: number; quantity: number; weight_g?: number
+    price: number; compare_at_price?: number; quantity?: number; weight_g?: number;
+    product_type?: 'physical' | 'digital' | 'course'
   }) => api.post<Product>('/products', data).then(r => r.data),
 
   update: (id: number, data: Partial<{
     category_id: number; title: string; description: string;
-    price: number; compare_at_price: number; quantity: number; weight_g: number
+    price: number; compare_at_price: number; quantity: number; weight_g: number;
+    product_type: 'physical' | 'digital' | 'course'
   }>) => api.put<Product>(`/products/${id}`, data).then(r => r.data),
 
   delete: (id: number) => api.delete(`/products/${id}`),
@@ -97,8 +100,29 @@ export const productsApi = {
     }).then(r => r.data)
   },
 
+  // Digital files of a digital/course product (seller-managed).
+  listDigitalAssets: (productId: number) =>
+    api.get<DigitalAsset[]>(`/products/${productId}/digital-assets`).then(r => r.data),
+  uploadDigitalAsset: (productId: number, file: File) => {
+    const form = new FormData()
+    form.append('file', file)
+    return api.post<DigitalAsset>(`/products/${productId}/digital-assets`, form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }).then(r => r.data)
+  },
+  deleteDigitalAsset: (productId: number, assetId: number) =>
+    api.delete(`/products/${productId}/digital-assets/${assetId}`),
+
   myProducts: (params?: { page?: number; page_size?: number; status?: string }) =>
     api.get<PaginatedResponse<Product>>('/products/seller/my', { params }).then(r => r.data),
+}
+
+// ─── Digital library (buyer's purchased digital products / courses) ─────────────
+export const libraryApi = {
+  list: () => api.get<Entitlement[]>('/library').then(r => r.data),
+  // Authenticated download endpoint; returns a Blob (Bearer token attached by interceptor).
+  download: (productId: number, assetId: number) =>
+    api.get(`/library/${productId}/files/${assetId}`, { responseType: 'blob' }),
 }
 
 // ─── Shops ────────────────────────────────────────────────────────────────────
@@ -295,13 +319,14 @@ export const adminApi = {
   refundOrder: (id: number) =>
     api.post(`/admin/orders/${id}/refund`).then(r => r.data),
 
-  // Categories
+  // Categories (full tree)
   listCategories: () => api.get<Category[]>('/admin/categories').then(r => r.data),
-  createCategory: (data: { name: string; slug: string; parent_id?: number; image?: string; sort_order?: number }) =>
+  createCategory: (data: { name: string; slug?: string; parent_id?: number; image?: string; sort_order?: number; kind?: 'physical' | 'digital' | 'course' | null }) =>
     api.post<Category>('/admin/categories', data).then(r => r.data),
-  updateCategory: (id: number, data: Partial<{ name: string; slug: string; parent_id: number; sort_order: number }>) =>
+  updateCategory: (id: number, data: Partial<{ name: string; slug: string; parent_id: number | null; sort_order: number; kind: 'physical' | 'digital' | 'course' | null }>) =>
     api.put<Category>(`/admin/categories/${id}`, data).then(r => r.data),
-  deleteCategory: (id: number) => api.delete(`/admin/categories/${id}`),
+  deleteCategory: (id: number, reassignTo?: number) =>
+    api.delete(`/admin/categories/${id}`, { params: reassignTo ? { reassign_to: reassignTo } : undefined }),
 
   // Reports
   listReports: (params?: { page?: number; status?: string }) =>

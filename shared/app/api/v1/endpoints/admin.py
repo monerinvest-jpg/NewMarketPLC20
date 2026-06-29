@@ -730,15 +730,48 @@ async def rebuild_recommendations(
 
 
 # ─── Categories ───────────────────────────────────────────────────────────────
+
+def _cat_out(c: Category) -> CategoryOut:
+    """Build a CategoryOut without touching the lazy `children` relationship."""
+    return CategoryOut(
+        id=c.id, parent_id=c.parent_id, name=c.name, slug=c.slug,
+        image=c.image, sort_order=c.sort_order, kind=c.kind, children=[],
+    )
+
+
+async def _unique_category_slug(db: AsyncSession, base: str, exclude_id: int | None = None) -> str:
+    """Ensure the slug is unique across categories, suffixing -2, -3, ... if needed."""
+    from app.services.slug_service import slugify
+    base = slugify(base) or "category"
+    candidate, n = base, 1
+    while True:
+        q = select(Category.id).where(Category.slug == candidate)
+        if exclude_id is not None:
+            q = q.where(Category.id != exclude_id)
+        if (await db.execute(q)).scalar_one_or_none() is None:
+            return candidate
+        n += 1
+        candidate = f"{base}-{n}"
+
+
 @router.get("/categories", response_model=list[CategoryOut])
 async def list_categories_admin(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(get_current_moderator_or_admin),
 ):
-    result = await db.execute(
-        select(Category).options(selectinload(Category.children)).where(Category.parent_id == None)
-    )
-    return result.scalars().all()
+    """Full category tree (any depth), built from a single flat load."""
+    cats = (await db.execute(
+        select(Category).order_by(Category.sort_order, Category.name)
+    )).scalars().all()
+    nodes = {c.id: _cat_out(c) for c in cats}
+    roots: list[CategoryOut] = []
+    for c in cats:
+        node = nodes[c.id]
+        if c.parent_id and c.parent_id in nodes:
+            nodes[c.parent_id].children.append(node)
+        else:
+            roots.append(node)
+    return roots
 
 
 @router.post("/categories", response_model=CategoryOut, status_code=201)
@@ -747,11 +780,32 @@ async def create_category(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(get_current_superadmin),
 ):
-    cat = Category(**payload.model_dump())
+    data = payload.model_dump()
+    if data.get("parent_id"):
+        parent = (await db.execute(select(Category).where(Category.id == data["parent_id"]))).scalar_one_or_none()
+        if not parent:
+            raise HTTPException(status_code=400, detail="Родительская категория не найдена")
+    data["slug"] = await _unique_category_slug(db, data.get("slug") or data["name"])
+    cat = Category(**data)
     db.add(cat)
     await db.commit()
     await db.refresh(cat)
-    return cat
+    return _cat_out(cat)
+
+
+async def _is_descendant(db: AsyncSession, candidate_parent_id: int, cat_id: int) -> bool:
+    """True if candidate_parent_id is `cat_id` itself or one of its descendants
+    (moving a category under its own subtree would create a cycle)."""
+    current = candidate_parent_id
+    seen = set()
+    while current is not None and current not in seen:
+        if current == cat_id:
+            return True
+        seen.add(current)
+        current = (await db.execute(
+            select(Category.parent_id).where(Category.id == current)
+        )).scalar_one_or_none()
+    return False
 
 
 @router.put("/categories/{cat_id}", response_model=CategoryOut)
@@ -761,27 +815,71 @@ async def update_category(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(get_current_superadmin),
 ):
-    result = await db.execute(select(Category).where(Category.id == cat_id))
-    cat = result.scalar_one_or_none()
+    cat = (await db.execute(select(Category).where(Category.id == cat_id))).scalar_one_or_none()
     if not cat:
         raise HTTPException(status_code=404, detail="Category not found")
-    for field, value in payload.model_dump(exclude_unset=True).items():
+
+    data = payload.model_dump(exclude_unset=True)
+
+    # Moving the category: validate the new parent and prevent cycles.
+    if "parent_id" in data and data["parent_id"] != cat.parent_id:
+        new_parent = data["parent_id"]
+        if new_parent is not None:
+            if new_parent == cat_id or await _is_descendant(db, new_parent, cat_id):
+                raise HTTPException(status_code=400, detail="Нельзя переместить категорию внутрь самой себя")
+            if (await db.execute(select(Category.id).where(Category.id == new_parent))).scalar_one_or_none() is None:
+                raise HTTPException(status_code=400, detail="Родительская категория не найдена")
+
+    if "slug" in data or "name" in data:
+        base = data.get("slug") or data.get("name") or cat.name
+        data["slug"] = await _unique_category_slug(db, base, exclude_id=cat_id)
+
+    for field, value in data.items():
         setattr(cat, field, value)
     await db.commit()
     await db.refresh(cat)
-    return cat
+    return _cat_out(cat)
 
 
 @router.delete("/categories/{cat_id}", status_code=204)
 async def delete_category(
     cat_id: int,
+    reassign_to: int | None = None,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(get_current_superadmin),
 ):
-    result = await db.execute(select(Category).where(Category.id == cat_id))
-    cat = result.scalar_one_or_none()
+    """
+    Delete a category. Refuses if it still has subcategories. If it has products,
+    pass ?reassign_to=<other_category_id> to move them first; otherwise the
+    deletion is refused so products are never orphaned.
+    """
+    from app.models.models import Product
+    cat = (await db.execute(select(Category).where(Category.id == cat_id))).scalar_one_or_none()
     if not cat:
         raise HTTPException(status_code=404, detail="Category not found")
+
+    child_count = (await db.execute(
+        select(func.count()).select_from(Category).where(Category.parent_id == cat_id)
+    )).scalar_one()
+    if child_count:
+        raise HTTPException(status_code=400, detail="Сначала удалите или перенесите подкатегории")
+
+    product_count = (await db.execute(
+        select(func.count()).select_from(Product).where(Product.category_id == cat_id)
+    )).scalar_one()
+    if product_count:
+        if reassign_to is None:
+            raise HTTPException(
+                status_code=400,
+                detail=f"В категории {product_count} тов. Передайте reassign_to для переноса перед удалением.",
+            )
+        target = (await db.execute(select(Category).where(Category.id == reassign_to))).scalar_one_or_none()
+        if not target or reassign_to == cat_id:
+            raise HTTPException(status_code=400, detail="Неверная категория для переноса")
+        await db.execute(
+            update(Product).where(Product.category_id == cat_id).values(category_id=reassign_to)
+        )
+
     await db.delete(cat)
     await db.commit()
 

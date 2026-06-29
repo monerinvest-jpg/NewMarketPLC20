@@ -10,7 +10,7 @@ from pydantic import BaseModel, EmailStr, Field, field_validator, model_validato
 from app.models.models import (
     BalanceTransactionType, DiscountType, FiscalReceiptStatus, FiscalReceiptType,
     OrderStatus, PaymentGateway,
-    PaymentStatus, ProductStatus, ReferralType, ReportStatus,
+    PaymentStatus, ProductStatus, ProductType, CategoryKind, ReferralType, ReportStatus,
     TransactionType, UserRole, ReviewStatus,
 )
 
@@ -159,10 +159,11 @@ class ShopOut(OrmBase):
 
 class CategoryCreate(BaseModel):
     name: str
-    slug: str
+    slug: Optional[str] = None  # auto-generated from name if omitted
     parent_id: Optional[int] = None
     image: Optional[str] = None
     sort_order: int = 0
+    kind: Optional[CategoryKind] = None
 
 
 class CategoryUpdate(BaseModel):
@@ -171,6 +172,7 @@ class CategoryUpdate(BaseModel):
     parent_id: Optional[int] = None
     image: Optional[str] = None
     sort_order: Optional[int] = None
+    kind: Optional[CategoryKind] = None
 
 
 class CategoryOut(OrmBase):
@@ -180,6 +182,7 @@ class CategoryOut(OrmBase):
     slug: str
     image: Optional[str]
     sort_order: int
+    kind: Optional[CategoryKind] = None
     children: List["CategoryOut"] = []
 
 
@@ -203,8 +206,10 @@ class ProductCreate(BaseModel):
     description: Optional[str] = None
     price: Decimal = Field(gt=0)
     compare_at_price: Optional[Decimal] = None
-    quantity: int = Field(ge=0)
+    # Ignored for digital/course products (unlimited stock); defaults to 0.
+    quantity: int = Field(default=0, ge=0)
     weight_g: int = Field(default=500, ge=1)
+    product_type: ProductType = ProductType.physical
 
 
 class ProductUpdate(BaseModel):
@@ -215,6 +220,7 @@ class ProductUpdate(BaseModel):
     compare_at_price: Optional[Decimal] = None
     quantity: Optional[int] = Field(None, ge=0)
     weight_g: Optional[int] = None
+    product_type: Optional[ProductType] = None
 
 
 class ProductModerationUpdate(BaseModel):
@@ -233,6 +239,7 @@ class ProductOut(OrmBase):
     compare_at_price: Optional[Decimal]
     quantity: int
     weight_g: int
+    product_type: ProductType = ProductType.physical
     status: ProductStatus
     moderation_reason: Optional[str]
     rating: Decimal
@@ -244,6 +251,39 @@ class ProductOut(OrmBase):
     flash_price: Optional[Decimal] = None
     flash_discount_percent: Optional[Decimal] = None
     flash_ends_at: Optional[datetime] = None
+
+
+# ─────────────────────────────────────────────
+# Digital goods (files, entitlements)
+# ─────────────────────────────────────────────
+
+class DigitalAssetOut(OrmBase):
+    """A digital file of a product. NEVER exposes storage_key (internal)."""
+    id: int
+    file_name: str
+    content_type: str
+    size_bytes: int
+    sort_order: int
+
+
+class EntitlementFileOut(BaseModel):
+    asset_id: int
+    file_name: str
+    content_type: str
+    size_bytes: int
+
+
+class EntitlementOut(BaseModel):
+    """A buyer's purchased digital product, shown in their "Обучение"/downloads."""
+    id: int
+    product_id: int
+    product_title: str
+    product_slug: Optional[str] = None
+    order_id: int
+    granted_at: datetime
+    revoked: bool
+    download_count: int
+    files: List[EntitlementFileOut] = []
 
 
 class ProductListOut(OrmBase):

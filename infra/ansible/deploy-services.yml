@@ -161,7 +161,7 @@
         port: 8003
         paths: ["/api/v1/cart", "/api/v1/orders", "/api/v1/returns", "/api/v1/sub-orders",
                 "/api/v1/product-subscriptions", "/api/v1/disputes", "/api/v1/addresses",
-                "/api/v1/wishlists", "/api/v1/recently-viewed", "/api/v1/delivery"]
+                "/api/v1/wishlists", "/api/v1/recently-viewed", "/api/v1/library", "/api/v1/delivery"]
         priority: 0
       sellers:
         port: 8004

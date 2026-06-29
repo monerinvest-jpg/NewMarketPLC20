@@ -23,7 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.models import (
     BalanceTransaction, BalanceTransactionType, Coupon, Order,
-    PromoBalanceTransaction, User,
+    ProductType, PromoBalanceTransaction, User,
 )
 
 
@@ -31,14 +31,20 @@ async def restore_order(db: AsyncSession, order: Order) -> None:
     """Undo a cancelled order's stock and buyer-side credits. Caller commits."""
     from app.services.stock_service import record_movement
     from app.services.payout_service import refund_sellers_for_order
+    from app.services import entitlement_service
 
-    # 1. Return stock for every item (record_movement re-loads the row and
-    # applies the increment, so order.items.product need not be eager-loaded).
+    # 1. Return stock for every PHYSICAL item (digital/course have no stock).
+    # record_movement re-loads the row and applies the increment.
     for item in order.items:
+        if item.product is not None and item.product.product_type != ProductType.physical:
+            continue
         await record_movement(
             db, item.product_id, item.quantity, "cancel",
             variant_id=item.variant_id, note="Отмена заказа", apply_to_stock=True,
         )
+
+    # 1b. Revoke any digital/course access granted by this order.
+    await entitlement_service.revoke_for_order(db, order)
 
     # 2. Never pay out a cancelled order: mark still-pending items refunded.
     await refund_sellers_for_order(order, db)

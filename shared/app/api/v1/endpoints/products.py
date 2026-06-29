@@ -14,9 +14,9 @@ from app.api.v1.deps import get_current_seller, get_current_user, get_current_us
 from app.core.config import settings
 from app.core.database import get_db
 from app.models.models import (
-    Category, Product, ProductImage, ProductStatus, Shop, User,
+    Category, DigitalAsset, Product, ProductImage, ProductStatus, ProductType, Shop, User,
 )
-from app.schemas.schemas import ProductCreate, ProductOut, ProductUpdate
+from app.schemas.schemas import DigitalAssetOut, ProductCreate, ProductOut, ProductUpdate
 from app.services.settings_service import is_premoderation_enabled
 
 router = APIRouter(prefix="/products", tags=["products"])
@@ -205,6 +205,8 @@ async def create_product(
     premod = await is_premoderation_enabled(db)
     initial_status = ProductStatus.pending if premod else ProductStatus.active
 
+    # Digital/course products have unlimited stock — quantity/weight are ignored.
+    is_physical = payload.product_type == ProductType.physical
     product = Product(
         shop_id=shop.id,
         category_id=payload.category_id,
@@ -212,8 +214,9 @@ async def create_product(
         description=payload.description,
         price=payload.price,
         compare_at_price=payload.compare_at_price,
-        quantity=payload.quantity,
-        weight_g=payload.weight_g,
+        quantity=payload.quantity if is_physical else 0,
+        weight_g=payload.weight_g if is_physical else 0,
+        product_type=payload.product_type,
         status=initial_status,
     )
     db.add(product)
@@ -324,6 +327,99 @@ async def upload_product_image(
     db.add(image)
     await db.commit()
     return {"url": image.url}
+
+
+# ─── Digital assets (seller) ──────────────────────────────────────────────────
+
+@router.get("/{product_id}/digital-assets", response_model=list[DigitalAssetOut])
+async def list_digital_assets(
+    product_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_seller),
+):
+    """List the digital files attached to the seller's own product."""
+    shop = await _get_seller_shop(current_user, db)
+    product = (await db.execute(
+        select(Product).where(Product.id == product_id, Product.shop_id == shop.id)
+    )).scalar_one_or_none()
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+    assets = (await db.execute(
+        select(DigitalAsset).where(DigitalAsset.product_id == product_id)
+        .order_by(DigitalAsset.sort_order, DigitalAsset.id)
+    )).scalars().all()
+    return assets
+
+
+@router.post("/{product_id}/digital-assets", response_model=DigitalAssetOut, status_code=status.HTTP_201_CREATED)
+async def upload_digital_asset(
+    product_id: int,
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_seller),
+):
+    """
+    Attach a downloadable file to a digital/course product. Stored privately;
+    buyers receive it only via an entitlement-checked download.
+    """
+    from app.services import digital_storage_service
+
+    shop = await _get_seller_shop(current_user, db)
+    product = (await db.execute(
+        select(Product).where(Product.id == product_id, Product.shop_id == shop.id)
+    )).scalar_one_or_none()
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+    if product.product_type == ProductType.physical:
+        raise HTTPException(status_code=400, detail="Файлы можно прикладывать только к цифровым товарам или курсам")
+
+    content = await file.read()
+    try:
+        storage_key, size = await digital_storage_service.save_digital_asset(
+            content, file.content_type or "application/octet-stream", file.filename or "file",
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    next_order = (await db.execute(
+        select(func.coalesce(func.max(DigitalAsset.sort_order), -1)).where(DigitalAsset.product_id == product_id)
+    )).scalar_one() + 1
+    asset = DigitalAsset(
+        product_id=product_id,
+        file_name=file.filename or "file",
+        storage_key=storage_key,
+        content_type=file.content_type or "application/octet-stream",
+        size_bytes=size,
+        sort_order=next_order,
+    )
+    db.add(asset)
+    await db.commit()
+    await db.refresh(asset)
+    return asset
+
+
+@router.delete("/{product_id}/digital-assets/{asset_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_digital_asset(
+    product_id: int,
+    asset_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_seller),
+):
+    """Remove a digital file from the seller's product (also deletes the stored file)."""
+    from app.services import digital_storage_service
+
+    shop = await _get_seller_shop(current_user, db)
+    asset = (await db.execute(
+        select(DigitalAsset)
+        .join(Product, Product.id == DigitalAsset.product_id)
+        .where(DigitalAsset.id == asset_id, DigitalAsset.product_id == product_id, Product.shop_id == shop.id)
+    )).scalar_one_or_none()
+    if not asset:
+        raise HTTPException(status_code=404, detail="File not found")
+    key = asset.storage_key
+    await db.delete(asset)
+    await db.commit()
+    digital_storage_service.delete_digital_asset(key)
 
 
 @router.get("/seller/my", response_model=dict)

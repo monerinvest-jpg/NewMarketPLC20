@@ -41,6 +41,7 @@ export default function MainLayout() {
   const userMenuItems = [
     { key: 'profile', label: <Link to="/profile">Профиль</Link>, icon: <UserOutlined /> },
     { key: 'orders', label: <Link to="/orders">Мои заказы</Link> },
+    { key: 'downloads', label: <Link to="/my/downloads">Мои покупки</Link> },
     { key: 'returns', label: <Link to="/returns">Возвраты</Link> },
     { key: 'favorites', label: <Link to="/favorites">Избранное</Link>, icon: <HeartOutlined /> },
     { key: 'wishlists', label: <Link to="/wishlists">Мои коллекции</Link> },

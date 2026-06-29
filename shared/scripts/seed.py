@@ -68,6 +68,54 @@ async def seed():
         await db.commit()
         print("✓ Default categories created")
 
+        # Digital-goods and course category trees (instant-delivery / LMS).
+        from app.models.models import CategoryKind
+
+        async def _ensure_category(name, slug, kind=None, parent_id=None, sort_order=0):
+            existing = (await db.execute(
+                select(Category).where(Category.slug == slug)
+            )).scalar_one_or_none()
+            if existing:
+                return existing
+            cat = Category(name=name, slug=slug, kind=kind, parent_id=parent_id, sort_order=sort_order)
+            db.add(cat)
+            await db.flush()
+            return cat
+
+        digital_root = await _ensure_category("Цифровые товары", "digital-goods", CategoryKind.digital, sort_order=20)
+        digital_children = [
+            ("Электронные книги", "digital-ebooks"),
+            ("Шаблоны и пресеты", "digital-templates"),
+            ("Графика и иллюстрации", "digital-graphics"),
+            ("Шрифты", "digital-fonts"),
+            ("Музыка и звуки", "digital-audio"),
+            ("Видео и моушн", "digital-video"),
+            ("Софт и плагины", "digital-software"),
+            ("3D-модели", "digital-3d"),
+            ("Игровые ценности", "digital-gaming"),
+            ("Ключи и подписки", "digital-keys"),
+        ]
+        for i, (name, slug) in enumerate(digital_children, start=1):
+            await _ensure_category(name, slug, CategoryKind.digital, digital_root.id, i)
+
+        course_root = await _ensure_category("Курсы и обучение", "courses", CategoryKind.course, sort_order=21)
+        course_children = [
+            ("Программирование и IT", "course-it"),
+            ("Дизайн и графика", "course-design"),
+            ("Маркетинг и реклама", "course-marketing"),
+            ("Бизнес и финансы", "course-business"),
+            ("Языки", "course-languages"),
+            ("Здоровье и спорт", "course-health"),
+            ("Хобби и творчество", "course-hobby"),
+            ("Личностный рост", "course-personal"),
+            ("Школа и подготовка к экзаменам", "course-school"),
+        ]
+        for i, (name, slug) in enumerate(course_children, start=1):
+            await _ensure_category(name, slug, CategoryKind.course, course_root.id, i)
+
+        await db.commit()
+        print("✓ Digital & course categories created")
+
         # Default seller tariff plans (the classic free-high-commission vs
         # paid-low-commission trade-off). Admin can edit these in the panel.
         from app.models.models import SellerPlan

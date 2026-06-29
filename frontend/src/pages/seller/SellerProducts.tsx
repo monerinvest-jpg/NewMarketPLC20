@@ -5,8 +5,14 @@ import {
 } from 'antd'
 import { PlusOutlined, EditOutlined, DeleteOutlined, UploadOutlined, DownloadOutlined } from '@ant-design/icons'
 import { productsApi, categoriesApi } from '@/api'
-import type { Product, Category } from '@/types'
+import type { Product, Category, DigitalAsset } from '@/types'
 import type { UploadFile } from 'antd/es/upload/interface'
+
+const productTypeLabels: Record<string, { label: string; color: string }> = {
+  physical: { label: 'Физический', color: 'blue' },
+  digital: { label: 'Цифровой', color: 'purple' },
+  course: { label: 'Курс', color: 'gold' },
+}
 
 const { Title, Text } = Typography
 
@@ -24,6 +30,8 @@ export default function SellerProducts() {
   const [modalOpen, setModalOpen] = useState(false)
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
   const [form] = Form.useForm()
+  const productType = Form.useWatch('product_type', form) || 'physical'
+  const [digitalAssets, setDigitalAssets] = useState<DigitalAsset[]>([])
   const [fileList, setFileList] = useState<UploadFile[]>([])
   const [submitting, setSubmitting] = useState(false)
   const [selectedRowKeys, setSelectedRowKeys] = useState<number[]>([])
@@ -84,18 +92,49 @@ export default function SellerProducts() {
       .catch(() => message.error('Ошибка экспорта'))
   }
 
+  const loadDigitalAssets = async (productId: number) => {
+    try {
+      setDigitalAssets(await productsApi.listDigitalAssets(productId))
+    } catch {
+      setDigitalAssets([])
+    }
+  }
+
   const openCreate = () => {
     setEditingProduct(null)
     form.resetFields()
+    form.setFieldsValue({ product_type: 'physical' })
+    setDigitalAssets([])
     setFileList([])
     setModalOpen(true)
   }
 
   const openEdit = (product: Product) => {
     setEditingProduct(product)
-    form.setFieldsValue(product)
+    form.setFieldsValue({ product_type: 'physical', ...product })
     setFileList([])
+    setDigitalAssets([])
+    if ((product.product_type || 'physical') !== 'physical') {
+      loadDigitalAssets(product.id)
+    }
     setModalOpen(true)
+  }
+
+  const uploadDigitalFile = async (file: File) => {
+    if (!editingProduct) return
+    try {
+      await productsApi.uploadDigitalAsset(editingProduct.id, file)
+      message.success('Файл загружен')
+      loadDigitalAssets(editingProduct.id)
+    } catch (e: any) {
+      message.error(e.response?.data?.detail || 'Ошибка загрузки файла')
+    }
+  }
+
+  const removeDigitalFile = async (assetId: number) => {
+    if (!editingProduct) return
+    await productsApi.deleteDigitalAsset(editingProduct.id, assetId)
+    loadDigitalAssets(editingProduct.id)
   }
 
   const handleSubmit = async (values: any) => {
@@ -168,8 +207,18 @@ export default function SellerProducts() {
             },
           },
           { title: 'Название', dataIndex: 'title' },
+          {
+            title: 'Тип', dataIndex: 'product_type', width: 110,
+            render: (t) => {
+              const m = productTypeLabels[t || 'physical']
+              return <Tag color={m?.color}>{m?.label}</Tag>
+            },
+          },
           { title: 'Цена', dataIndex: 'price', render: (v) => `${parseFloat(v).toLocaleString('ru')} ₽` },
-          { title: 'Остаток', dataIndex: 'quantity' },
+          {
+            title: 'Остаток', dataIndex: 'quantity',
+            render: (v, p) => ((p.product_type || 'physical') === 'physical' ? v : '∞'),
+          },
           {
             title: 'Статус', dataIndex: 'status',
             render: (s) => <Tag color={statusLabels[s]?.color}>{statusLabels[s]?.label}</Tag>,
@@ -200,8 +249,21 @@ export default function SellerProducts() {
           <Form.Item name="title" label="Название" rules={[{ required: true, min: 3 }]}>
             <Input />
           </Form.Item>
+          <Form.Item name="product_type" label="Тип товара" initialValue="physical">
+            <Select
+              options={[
+                { value: 'physical', label: 'Физический (доставка)' },
+                { value: 'digital', label: 'Цифровой (мгновенная выдача файла)' },
+                { value: 'course', label: 'Курс (обучение)' },
+              ]}
+            />
+          </Form.Item>
           <Form.Item name="category_id" label="Категория" rules={[{ required: true }]}>
-            <Select options={categories.map((c) => ({ value: c.id, label: c.name }))} />
+            <Select
+              showSearch
+              optionFilterProp="label"
+              options={categories.map((c) => ({ value: c.id, label: c.name }))}
+            />
           </Form.Item>
           <Form.Item name="description" label="Описание">
             <Input.TextArea rows={4} />
@@ -214,14 +276,16 @@ export default function SellerProducts() {
               <InputNumber min={0} style={{ width: '100%' }} />
             </Form.Item>
           </Space>
-          <Space style={{ width: '100%' }}>
-            <Form.Item name="quantity" label="Остаток" rules={[{ required: true }]} style={{ flex: 1 }}>
-              <InputNumber min={0} style={{ width: '100%' }} />
-            </Form.Item>
-            <Form.Item name="weight_g" label="Вес, г" initialValue={500} style={{ flex: 1 }}>
-              <InputNumber min={1} style={{ width: '100%' }} />
-            </Form.Item>
-          </Space>
+          {productType === 'physical' && (
+            <Space style={{ width: '100%' }}>
+              <Form.Item name="quantity" label="Остаток" rules={[{ required: true }]} style={{ flex: 1 }}>
+                <InputNumber min={0} style={{ width: '100%' }} />
+              </Form.Item>
+              <Form.Item name="weight_g" label="Вес, г" initialValue={500} style={{ flex: 1 }}>
+                <InputNumber min={1} style={{ width: '100%' }} />
+              </Form.Item>
+            </Space>
+          )}
           <Form.Item label="Изображения">
             <Upload
               listType="picture-card"
@@ -233,6 +297,42 @@ export default function SellerProducts() {
               {fileList.length < 5 && <UploadOutlined />}
             </Upload>
           </Form.Item>
+
+          {productType !== 'physical' && (
+            <Form.Item label="Файлы для покупателя (выдаются после оплаты)">
+              {!editingProduct ? (
+                <Text type="secondary">
+                  Сохраните товар, затем откройте его на редактирование, чтобы приложить файлы.
+                </Text>
+              ) : (
+                <>
+                  {digitalAssets.length > 0 && (
+                    <ul style={{ paddingLeft: 18, marginBottom: 8 }}>
+                      {digitalAssets.map((a) => (
+                        <li key={a.id} style={{ marginBottom: 4 }}>
+                          {a.file_name}{' '}
+                          <Text type="secondary">({(a.size_bytes / (1024 * 1024)).toFixed(1)} МБ)</Text>{' '}
+                          <Popconfirm title="Удалить файл?" onConfirm={() => removeDigitalFile(a.id)}>
+                            <Button size="small" type="text" danger icon={<DeleteOutlined />} />
+                          </Popconfirm>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  <Upload
+                    fileList={[]}
+                    beforeUpload={(file) => { uploadDigitalFile(file as File); return false }}
+                    multiple
+                  >
+                    <Button icon={<UploadOutlined />}>Загрузить файл</Button>
+                  </Upload>
+                  <div style={{ marginTop: 4 }}>
+                    <Text type="secondary">PDF, ZIP, видео и т.д. Хранятся приватно, доступны только покупателю.</Text>
+                  </div>
+                </>
+              )}
+            </Form.Item>
+          )}
         </Form>
       </Modal>
 

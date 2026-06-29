@@ -21,6 +21,7 @@ from app.models.models import (
     Dispute, DisputeMessage, DisputeStatus, DisputeResolution,
     GiftCertificate, GiftCertificateStatus, PromoBalanceTransaction, LoyaltyTier,
     FiscalReceipt, FiscalReceiptType, FiscalReceiptStatus,
+    ProductType, CategoryKind, DigitalAsset, Entitlement,
 )
 
 __all__ = [
@@ -46,4 +47,5 @@ __all__ = [
     "Dispute", "DisputeMessage", "DisputeStatus", "DisputeResolution",
     "GiftCertificate", "GiftCertificateStatus", "PromoBalanceTransaction", "LoyaltyTier",
     "FiscalReceipt", "FiscalReceiptType", "FiscalReceiptStatus",
+    "ProductType", "CategoryKind", "DigitalAsset", "Entitlement",
 ]

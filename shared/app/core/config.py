@@ -169,6 +169,9 @@ class Settings(BaseSettings):
     # File uploads
     UPLOAD_DIR: str = "/app/uploads"
     MAX_UPLOAD_SIZE_MB: int = 10
+    # Max size for a single digital-product file (PDF/zip/video/etc.). Stored
+    # privately and delivered only to entitled buyers.
+    MAX_DIGITAL_UPLOAD_MB: int = 500
 
     @property
     def is_development(self) -> bool:
