@@ -7,7 +7,7 @@ const { Title, Text } = Typography
 
 const sections: Record<string, { title: string; keys: string[] }> = {
   commission: { title: 'Комиссии и платформа', keys: ['global_commission_percent', 'enable_premoderation', 'enable_review_premoderation', 'enable_paid_placement', 'site_name', 'site_description', 'support_email'] },
-  referral: { title: 'Реферальная программа', keys: ['referral_buyer_bonus_amount', 'referral_buyer_min_order_amount', 'referral_seller_bonus_amount', 'referral_bonus_max_discount_percent'] },
+  referral: { title: 'Реферальная программа', keys: ['referral_buyer_bonus_percent', 'referral_buyer_min_order_amount', 'referral_seller_bonus_percent', 'referral_bonus_max_discount_percent'] },
   orders: { title: 'Заказы', keys: ['order_auto_complete_days', 'order_auto_delivered_days'] },
   integrations: { title: 'Интеграции (API-ключи)', keys: ['yookassa_shop_id', 'yookassa_secret_key', 'cdek_client_id', 'cdek_client_secret'] },
 }

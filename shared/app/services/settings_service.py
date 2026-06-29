@@ -18,9 +18,9 @@ DEFAULTS: Dict[str, str] = {
     "enable_paid_placement": "false",
     "enable_loyalty_cashback": "true",
     "loyalty_cashback_percent": "5",
-    "referral_buyer_bonus_amount": "100",
+    "referral_buyer_bonus_percent": "5",
     "referral_buyer_min_order_amount": "1000",
-    "referral_seller_bonus_amount": "500",
+    "referral_seller_bonus_percent": "10",
     "referral_bonus_max_discount_percent": "30",
     "site_name": "Marketplace",
     "site_description": "Лучший маркетплейс уникальных товаров",
@@ -48,9 +48,9 @@ DESCRIPTIONS: Dict[str, str] = {
     "enable_paid_placement": "Включить платное размещение продавцов / тарифные планы (true/false)",
     "enable_loyalty_cashback": "Включить начисление кэшбэка баллами за покупки (true/false)",
     "loyalty_cashback_percent": "Процент кэшбэка баллами от суммы завершённого заказа",
-    "referral_buyer_bonus_amount": "Бонусных баллов за привлечённого покупателя",
-    "referral_buyer_min_order_amount": "Минимальная сумма первой покупки для начисления реферального бонуса",
-    "referral_seller_bonus_amount": "Денежное вознаграждение (руб.) за привлечённого продавца",
+    "referral_buyer_bonus_percent": "Бонус за привлечённого покупателя, % от его первой покупки (начисляется баллами)",
+    "referral_buyer_min_order_amount": "Минимальная сумма первой покупки для начисления реферального бонуса, ₽",
+    "referral_seller_bonus_percent": "Вознаграждение за привлечённого продавца, % от его первой продажи",
     "referral_bonus_max_discount_percent": "Макс. % от суммы заказа, который можно покрыть бонусами",
     "site_name": "Название сайта",
     "site_description": "Описание сайта",
@@ -132,9 +132,9 @@ async def is_review_premoderation_enabled(db: AsyncSession) -> bool:
 
 async def get_referral_settings(db: AsyncSession) -> Dict[str, Decimal]:
     keys = [
-        "referral_buyer_bonus_amount",
+        "referral_buyer_bonus_percent",
         "referral_buyer_min_order_amount",
-        "referral_seller_bonus_amount",
+        "referral_seller_bonus_percent",
         "referral_bonus_max_discount_percent",
     ]
     out = {}

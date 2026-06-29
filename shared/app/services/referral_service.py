@@ -80,7 +80,12 @@ async def process_buyer_referral_reward(order: Order, db: AsyncSession) -> None:
     if order.subtotal < min_amount:
         return
 
-    bonus = settings["referral_buyer_bonus_amount"]
+    # Bonus is a percentage of the referred buyer's first qualifying order
+    # subtotal, credited to the referrer as bonus points. The % is admin-tunable.
+    percent = settings["referral_buyer_bonus_percent"]
+    bonus = (order.subtotal * percent / Decimal("100")).quantize(Decimal("0.01"))
+    if bonus <= 0:
+        return
 
     # Credit bonus points to referrer
     referrer_result = await db.execute(select(User).where(User.id == referral.referrer_id))
@@ -147,7 +152,12 @@ async def process_seller_referral_reward(order: Order, db: AsyncSession) -> None
             continue
 
         settings = await get_referral_settings(db)
-        reward_amount = settings["referral_seller_bonus_amount"]
+        # Reward is a percentage of the referred seller's first completed order
+        # subtotal, paid to the referrer's balance. The % is admin-tunable.
+        percent = settings["referral_seller_bonus_percent"]
+        reward_amount = (order.subtotal * percent / Decimal("100")).quantize(Decimal("0.01"))
+        if reward_amount <= 0:
+            continue
 
         referrer_result = await db.execute(select(User).where(User.id == referral.referrer_id))
         referrer = referrer_result.scalar_one_or_none()

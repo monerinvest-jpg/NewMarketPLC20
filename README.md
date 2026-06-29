@@ -353,9 +353,9 @@ FIRST_SUPERUSER_PASSWORD=admin123
 | `global_commission_percent` | Глобальная комиссия платформы | 10.0% |
 | `enable_premoderation` | Премодерация товаров | true |
 | `enable_review_premoderation` | Премодерация отзывов | true |
-| `referral_buyer_bonus_amount` | Бонус за покупателя | 100 ₽ |
+| `referral_buyer_bonus_percent` | Бонус за покупателя, % от его 1-й покупки | 5% |
 | `referral_buyer_min_order_amount` | Мин. сумма для бонуса | 1000 ₽ |
-| `referral_seller_bonus_amount` | Бонус за продавца | 500 ₽ |
+| `referral_seller_bonus_percent` | Бонус за продавца, % от его 1-й продажи | 10% |
 | `referral_bonus_max_discount_percent` | Макс. % оплаты бонусами | 30% |
 | `order_auto_delivered_days` | Дней до автоотметки «доставлен» | 14 |
 | `order_auto_complete_days` | Дней до автозавершения заказа | 7 |
