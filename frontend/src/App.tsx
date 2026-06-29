@@ -28,6 +28,7 @@ const MyDownloadsPage = lazy(() => import('./pages/buyer/MyDownloadsPage'))
 const LearningPage = lazy(() => import('./pages/buyer/LearningPage'))
 const CoursePlayerPage = lazy(() => import('./pages/buyer/CoursePlayerPage'))
 const SellerCourseBuilder = lazy(() => import('./pages/seller/SellerCourseBuilder'))
+const CertificateVerifyPage = lazy(() => import('./pages/catalog/CertificateVerifyPage'))
 
 // Seller pages
 const SellerDashboard = lazy(() => import('./pages/seller/SellerDashboard'))
@@ -121,6 +122,7 @@ function App() {
               <Route path="/products/:id" element={<ProductPage />} />
               <Route path="/shops/:id" element={<ShopPage />} />
               <Route path="/compare" element={<ComparePage />} />
+              <Route path="/verify/:code" element={<CertificateVerifyPage />} />
               <Route path="/login" element={<LoginPage />} />
               <Route path="/register" element={<RegisterPage />} />
               <Route path="/verify-email" element={<VerifyEmailPage />} />

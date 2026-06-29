@@ -140,7 +140,34 @@ export interface Entitlement {
 }
 
 // ─── Courses / LMS ──────────────────────────────────────────────
-export type LessonType = 'video' | 'pdf' | 'text'
+export type LessonType = 'video' | 'pdf' | 'text' | 'quiz'
+
+export interface QuizQuestion {
+  q: string
+  options: string[]
+  correct?: number   // only present for the owning seller
+}
+
+export interface QuizContent {
+  pass_score: number
+  questions: QuizQuestion[]
+}
+
+export interface QuizResult {
+  score: number
+  passed: boolean
+  correct_count: number
+  total: number
+}
+
+export interface Certificate {
+  code: string
+  course_id: number
+  product_id: number
+  course_title: string
+  recipient_name: string
+  issued_at: string
+}
 
 export interface CourseLessonNode {
   id: number
@@ -150,9 +177,11 @@ export interface CourseLessonNode {
   is_preview: boolean
   sort_order: number
   has_file: boolean
+  hls_ready: boolean
   locked: boolean
   completed: boolean
   text_body?: string | null
+  quiz?: QuizContent | null
 }
 
 export interface CourseModuleNode {

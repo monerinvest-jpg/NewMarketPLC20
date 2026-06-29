@@ -23,6 +23,7 @@ from app.models.models import (
     FiscalReceipt, FiscalReceiptType, FiscalReceiptStatus,
     ProductType, CategoryKind, DigitalAsset, Entitlement,
     LessonType, Course, CourseModule, CourseLesson, LessonProgress,
+    QuizAttempt, Certificate,
 )
 
 __all__ = [
@@ -50,4 +51,5 @@ __all__ = [
     "FiscalReceipt", "FiscalReceiptType", "FiscalReceiptStatus",
     "ProductType", "CategoryKind", "DigitalAsset", "Entitlement",
     "LessonType", "Course", "CourseModule", "CourseLesson", "LessonProgress",
+    "QuizAttempt", "Certificate",
 ]

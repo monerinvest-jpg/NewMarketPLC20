@@ -77,6 +77,7 @@ class LessonType(str, enum.Enum):
     video = "video"   # private video file, streamed to entitled buyers
     pdf = "pdf"       # private PDF, shown in the protected reader
     text = "text"     # inline rich text/HTML stored in the DB
+    quiz = "quiz"     # graded questions; quiz_json holds questions + answer key
 
 
 class ShopStatus(str, enum.Enum):
@@ -599,6 +600,12 @@ class CourseLesson(Base):
     storage_key: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
     content_type: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
     text_body: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # quiz lessons: JSON {"pass_score": 70, "questions": [{"q","options":[...],"correct":idx}]}.
+    # The answer key (correct indices) is stripped before sending to buyers.
+    quiz_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # Set once a video lesson has been packaged into encrypted HLS (AES-128). The
+    # HLS files live privately under "hls/<lesson_id>/" and are served gated.
+    hls_ready: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default="false")
     duration_seconds: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     is_preview: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
@@ -626,6 +633,43 @@ class LessonProgress(Base):
     __table_args__ = (
         UniqueConstraint("user_id", "lesson_id", name="uq_lesson_progress_user_lesson"),
         Index("ix_lesson_progress_user_course", "user_id", "course_id"),
+    )
+
+
+class QuizAttempt(Base):
+    """A buyer's attempt at a quiz lesson (kept for history; latest pass completes the lesson)."""
+    __tablename__ = "quiz_attempt"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("user.id"), nullable=False)
+    lesson_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("course_lesson.id"), nullable=False)
+    course_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("course.id"), nullable=False)
+    score: Mapped[int] = mapped_column(Integer, default=0, nullable=False)       # percent 0..100
+    passed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    answers_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)     # submitted answers snapshot
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+
+    __table_args__ = (
+        Index("ix_quiz_attempt_user_lesson", "user_id", "lesson_id"),
+    )
+
+
+class Certificate(Base):
+    """Completion certificate issued once a buyer finishes 100% of a course."""
+    __tablename__ = "certificate"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("user.id"), nullable=False)
+    course_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("course.id"), nullable=False)
+    product_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("product.id"), nullable=False)
+    code: Mapped[str] = mapped_column(String(32), nullable=False, unique=True)   # public verification code
+    recipient_name: Mapped[str] = mapped_column(String(255), nullable=False)     # snapshot at issue time
+    course_title: Mapped[str] = mapped_column(String(512), nullable=False)       # snapshot
+    issued_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "course_id", name="uq_certificate_user_course"),
+        Index("ix_certificate_code", "code"),
     )
 
 

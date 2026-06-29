@@ -18,7 +18,8 @@
     "antd": "^5.17.4",
     "@ant-design/icons": "^5.3.7",
     "dayjs": "^1.11.11",
-    "recharts": "^2.12.7"
+    "recharts": "^2.12.7",
+    "hls.js": "^1.5.13"
   },
   "devDependencies": {
     "@types/react": "^18.3.3",

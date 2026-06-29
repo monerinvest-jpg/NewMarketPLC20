@@ -107,6 +107,36 @@ def local_path(key: str) -> str:
     return os.path.join(_PRIVATE_BASE, key)
 
 
+def save_bytes(key: str, content: bytes, content_type: str = "application/octet-stream") -> None:
+    """Store raw bytes at a SPECIFIC private key (used by the HLS packager for
+    playlists/segments/keys). S3 when configured, else local."""
+    if _s3_configured():
+        try:
+            _s3_client().put_object(Bucket=settings.S3_BUCKET, Key=key, Body=content, ContentType=content_type)
+            return
+        except Exception:
+            pass
+    path = os.path.join(_PRIVATE_BASE, key)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "wb") as f:
+        f.write(content)
+
+
+def read_bytes(key: str) -> Optional[bytes]:
+    """Read a privately stored object's bytes (for gated proxy serving / packaging)."""
+    if _s3_configured():
+        try:
+            obj = _s3_client().get_object(Bucket=settings.S3_BUCKET, Key=key)
+            return obj["Body"].read()
+        except Exception:
+            return None
+    path = os.path.join(_PRIVATE_BASE, key)
+    if os.path.isfile(path):
+        with open(path, "rb") as f:
+            return f.read()
+    return None
+
+
 def presigned_url(key: str, file_name: str, expires: int = 300) -> Optional[str]:
     """Short-lived presigned GET URL forcing an attachment download. S3 only."""
     if not _s3_configured():

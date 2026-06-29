@@ -5,6 +5,7 @@ and progress), and lazy creation of the Course record for a course product.
 Course access reuses the digital-goods Entitlement: buying a course-type product
 grants access, exactly like a digital download.
 """
+import json
 from typing import Optional
 
 from sqlalchemy import func, select
@@ -16,6 +17,42 @@ from app.models.models import (
 )
 from app.schemas.schemas import CourseOut, LessonOut, ModuleOut
 from app.services import entitlement_service
+
+
+def _quiz_for_view(quiz_json: str, include_answers: bool) -> dict:
+    """Parse stored quiz JSON for display. Buyers never receive the answer key."""
+    try:
+        data = json.loads(quiz_json) or {}
+    except Exception:
+        return {"pass_score": 70, "questions": []}
+    questions = []
+    for q in data.get("questions", []):
+        item = {"q": q.get("q", ""), "options": q.get("options", [])}
+        if include_answers:
+            item["correct"] = q.get("correct", 0)
+        questions.append(item)
+    return {"pass_score": int(data.get("pass_score", 70)), "questions": questions}
+
+
+def grade_quiz(quiz_json: Optional[str], answers: list[int]) -> tuple[int, bool, int, int]:
+    """Grade submitted answers against the stored key.
+    Returns (score_percent, passed, correct_count, total)."""
+    try:
+        data = json.loads(quiz_json or "{}") or {}
+    except Exception:
+        data = {}
+    questions = data.get("questions", [])
+    total = len(questions)
+    if total == 0:
+        return 0, False, 0, 0
+    correct = 0
+    for i, q in enumerate(questions):
+        chosen = answers[i] if i < len(answers) else -1
+        if chosen == q.get("correct", 0):
+            correct += 1
+    score = int(round(correct / total * 100))
+    passed = score >= int(data.get("pass_score", 70))
+    return score, passed, correct, total
 
 
 async def get_course_for_product(db: AsyncSession, product_id: int) -> Optional[Course]:
@@ -78,6 +115,9 @@ async def build_curriculum(
             done = lesson.id in completed_ids
             if done:
                 completed_lessons += 1
+            quiz_payload = None
+            if lesson.lesson_type == LessonType.quiz and lesson.quiz_json and unlocked:
+                quiz_payload = _quiz_for_view(lesson.quiz_json, include_answers=force_unlock)
             lessons_out.append(LessonOut(
                 id=lesson.id,
                 title=lesson.title,
@@ -86,9 +126,11 @@ async def build_curriculum(
                 is_preview=lesson.is_preview,
                 sort_order=lesson.sort_order,
                 has_file=bool(lesson.storage_key),
+                hls_ready=bool(getattr(lesson, "hls_ready", False)),
                 locked=not unlocked,
                 completed=done,
                 text_body=lesson.text_body if (unlocked and lesson.lesson_type == LessonType.text) else None,
+                quiz=quiz_payload,
             ))
         modules_out.append(ModuleOut(
             id=module.id, title=module.title, sort_order=module.sort_order, lessons=lessons_out,

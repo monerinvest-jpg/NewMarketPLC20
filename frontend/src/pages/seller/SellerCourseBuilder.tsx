@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   Card, Button, Collapse, Modal, Form, Input, Select, Switch, Upload, Tag,
-  Typography, message, Space, Popconfirm, Spin, Empty,
+  Typography, message, Space, Popconfirm, Spin, Empty, InputNumber, Radio, Divider,
 } from 'antd'
 import {
   PlusOutlined, EditOutlined, DeleteOutlined, UploadOutlined, ArrowLeftOutlined,
@@ -17,7 +17,11 @@ const typeMeta: Record<string, { icon: JSX.Element; label: string }> = {
   video: { icon: <PlayCircleOutlined />, label: 'Видео' },
   pdf: { icon: <FilePdfOutlined />, label: 'PDF' },
   text: { icon: <FileTextOutlined />, label: 'Текст' },
+  quiz: { icon: <CheckCircleOutlined />, label: 'Тест' },
 }
+
+type QuizQ = { q: string; options: string[]; correct: number }
+const emptyQuiz = { pass_score: 70, questions: [] as QuizQ[] }
 
 export default function SellerCourseBuilder() {
   const { productId } = useParams()
@@ -32,6 +36,21 @@ export default function SellerCourseBuilder() {
   const [lessonModal, setLessonModal] = useState<{ moduleId: number; lesson?: CourseLessonNode } | null>(null)
   const [lessonForm] = Form.useForm()
   const lessonType = Form.useWatch('lesson_type', lessonForm)
+  const [quiz, setQuiz] = useState<{ pass_score: number; questions: QuizQ[] }>(emptyQuiz)
+
+  // ---- quiz editor helpers (immutable updates) ----
+  const setQ = (qi: number, patch: Partial<QuizQ>) =>
+    setQuiz((s) => ({ ...s, questions: s.questions.map((q, i) => (i === qi ? { ...q, ...patch } : q)) }))
+  const addQuestion = () => setQuiz((s) => ({ ...s, questions: [...s.questions, { q: '', options: ['', ''], correct: 0 }] }))
+  const removeQuestion = (qi: number) => setQuiz((s) => ({ ...s, questions: s.questions.filter((_, i) => i !== qi) }))
+  const setOption = (qi: number, oi: number, val: string) =>
+    setQ(qi, { options: quiz.questions[qi].options.map((o, i) => (i === oi ? val : o)) })
+  const addOption = (qi: number) => setQ(qi, { options: [...quiz.questions[qi].options, ''] })
+  const removeOption = (qi: number, oi: number) => {
+    const q = quiz.questions[qi]
+    const options = q.options.filter((_, i) => i !== oi)
+    setQ(qi, { options, correct: q.correct >= options.length ? 0 : q.correct })
+  }
 
   const load = async () => {
     try {
@@ -59,10 +78,22 @@ export default function SellerCourseBuilder() {
   const openLesson = (moduleId: number, lesson?: CourseLessonNode) => {
     setLessonModal({ moduleId, lesson })
     lessonForm.setFieldsValue(lesson ?? { lesson_type: 'video', is_preview: false, sort_order: 0 })
+    if (lesson?.quiz) {
+      setQuiz({
+        pass_score: lesson.quiz.pass_score ?? 70,
+        questions: (lesson.quiz.questions || []).map((q) => ({ q: q.q, options: q.options, correct: q.correct ?? 0 })),
+      })
+    } else {
+      setQuiz(emptyQuiz)
+    }
   }
 
   const submitLesson = async (v: any) => {
     if (!lessonModal) return
+    if (v.lesson_type === 'quiz') {
+      if (quiz.questions.length === 0) { message.error('Добавьте хотя бы один вопрос'); return }
+      v.quiz = quiz
+    }
     try {
       if (lessonModal.lesson) {
         await coursesApi.updateLesson(pid, lessonModal.lesson.id, v)
@@ -130,12 +161,12 @@ export default function SellerCourseBuilder() {
                         <span>{l.title}</span>
                         <Tag>{typeMeta[l.lesson_type].label}</Tag>
                         {l.is_preview && <Tag color="green">превью</Tag>}
-                        {l.lesson_type !== 'text' && (l.has_file
-                          ? <Tag color="blue" icon={<CheckCircleOutlined />}>файл</Tag>
+                        {(l.lesson_type === 'video' || l.lesson_type === 'pdf') && (l.has_file
+                          ? <Tag color="blue" icon={<CheckCircleOutlined />}>{l.lesson_type === 'video' && l.hls_ready ? 'HLS готов' : 'файл'}</Tag>
                           : <Tag color="orange">нет файла</Tag>)}
                       </Space>
                       <Space>
-                        {l.lesson_type !== 'text' && (
+                        {(l.lesson_type === 'video' || l.lesson_type === 'pdf') && (
                           <Upload showUploadList={false} beforeUpload={(f) => { uploadFile(l.id, f as File); return false }}>
                             <Button size="small" icon={<UploadOutlined />}>{l.has_file ? 'Заменить' : 'Загрузить'}</Button>
                           </Upload>
@@ -185,6 +216,7 @@ export default function SellerCourseBuilder() {
                 { value: 'video', label: 'Видео' },
                 { value: 'pdf', label: 'PDF' },
                 { value: 'text', label: 'Текст' },
+                { value: 'quiz', label: 'Тест' },
               ]}
             />
           </Form.Item>
@@ -192,6 +224,39 @@ export default function SellerCourseBuilder() {
             <Form.Item name="text_body" label="Текст урока (HTML разрешён)">
               <Input.TextArea rows={8} />
             </Form.Item>
+          )}
+          {lessonType === 'quiz' && (
+            <div style={{ marginBottom: 16 }}>
+              <Divider orientation="left">Вопросы теста</Divider>
+              <Space style={{ marginBottom: 8 }}>
+                <Text>Проходной балл, %:</Text>
+                <InputNumber min={0} max={100} value={quiz.pass_score}
+                  onChange={(v) => setQuiz((s) => ({ ...s, pass_score: Number(v) || 0 }))} />
+              </Space>
+              {quiz.questions.map((q, qi) => (
+                <Card key={qi} size="small" style={{ marginBottom: 8 }}
+                  title={`Вопрос ${qi + 1}`}
+                  extra={<Button size="small" danger icon={<DeleteOutlined />} onClick={() => removeQuestion(qi)} />}>
+                  <Input placeholder="Текст вопроса" value={q.q}
+                    onChange={(e) => setQ(qi, { q: e.target.value })} style={{ marginBottom: 8 }} />
+                  <Radio.Group value={q.correct} onChange={(e) => setQ(qi, { correct: e.target.value })} style={{ width: '100%' }}>
+                    {q.options.map((opt, oi) => (
+                      <div key={oi} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                        <Radio value={oi} />
+                        <Input placeholder={`Вариант ${oi + 1}`} value={opt}
+                          onChange={(e) => setOption(qi, oi, e.target.value)} />
+                        {q.options.length > 2 && (
+                          <Button size="small" type="text" danger icon={<DeleteOutlined />} onClick={() => removeOption(qi, oi)} />
+                        )}
+                      </div>
+                    ))}
+                  </Radio.Group>
+                  <Button size="small" type="dashed" onClick={() => addOption(qi)}>+ вариант</Button>
+                  <div style={{ marginTop: 4 }}><Text type="secondary">Отметьте правильный вариант радиокнопкой.</Text></div>
+                </Card>
+              ))}
+              <Button type="dashed" icon={<PlusOutlined />} onClick={addQuestion} block>Добавить вопрос</Button>
+            </div>
           )}
           {lessonType === 'video' && (
             <Form.Item name="duration_seconds" label="Длительность, сек" initialValue={0}>

@@ -305,10 +305,33 @@ class ModuleUpdate(BaseModel):
     sort_order: Optional[int] = None
 
 
+class QuizQuestionIn(BaseModel):
+    q: str
+    options: List[str]
+    correct: int = 0              # index of the correct option
+
+
+class QuizPayload(BaseModel):
+    pass_score: int = 70         # percent needed to pass
+    questions: List[QuizQuestionIn] = []
+
+
+class QuizSubmit(BaseModel):
+    answers: List[int]           # selected option index per question (-1 = unanswered)
+
+
+class QuizResultOut(BaseModel):
+    score: int
+    passed: bool
+    correct_count: int
+    total: int
+
+
 class LessonCreate(BaseModel):
     title: str = Field(min_length=1)
     lesson_type: LessonType
     text_body: Optional[str] = None       # for text lessons
+    quiz: Optional[QuizPayload] = None    # for quiz lessons
     is_preview: bool = False
     sort_order: int = 0
     duration_seconds: int = 0
@@ -317,6 +340,7 @@ class LessonCreate(BaseModel):
 class LessonUpdate(BaseModel):
     title: Optional[str] = None
     text_body: Optional[str] = None
+    quiz: Optional[QuizPayload] = None
     is_preview: Optional[bool] = None
     sort_order: Optional[int] = None
     duration_seconds: Optional[int] = None
@@ -330,9 +354,20 @@ class LessonOut(BaseModel):
     is_preview: bool
     sort_order: int
     has_file: bool = False
+    hls_ready: bool = False           # video packaged into encrypted HLS → use the HLS player
     locked: bool = True          # true unless the requester is entitled or it's a preview
     completed: bool = False
     text_body: Optional[str] = None   # included only when unlocked and type=text
+    quiz: Optional[dict] = None       # quiz content; answer key stripped for buyers
+
+
+class CertificateOut(BaseModel):
+    code: str
+    course_id: int
+    product_id: int
+    course_title: str
+    recipient_name: str
+    issued_at: datetime
 
 
 class ModuleOut(BaseModel):

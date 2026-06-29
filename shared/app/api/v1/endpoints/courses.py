@@ -5,24 +5,25 @@ Public course detail + curriculum, the buyer's lesson playback (entitlement- or
 preview-gated), progress tracking, and the seller's course builder. Course access
 reuses the digital-goods Entitlement (buying a course-type product enrolls you).
 """
+import json
 import os
-from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import FileResponse, RedirectResponse, Response
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.deps import get_current_seller, get_current_user, get_current_user_optional
 from app.core.database import get_db
 from app.models.models import (
-    Course, CourseLesson, CourseModule, Entitlement, LessonProgress, LessonType,
-    Product, ProductType, Shop, User,
+    Certificate, Course, CourseLesson, CourseModule, Entitlement, LessonProgress, LessonType,
+    Product, ProductType, QuizAttempt, Shop, User,
 )
 from app.schemas.schemas import (
-    CourseOut, CourseUpsert, LessonCreate, LessonOut, LessonUpdate, ModuleCreate, ModuleOut, ModuleUpdate,
+    CertificateOut, CourseOut, CourseUpsert, LessonCreate, LessonOut, LessonUpdate,
+    ModuleCreate, ModuleOut, ModuleUpdate, QuizResultOut, QuizSubmit,
 )
-from app.services import course_service, digital_storage_service
+from app.services import certificate_service, course_service, digital_storage_service
 
 router = APIRouter(prefix="/courses", tags=["courses"])
 learning_router = APIRouter(prefix="/learning", tags=["learning"])
@@ -69,12 +70,17 @@ async def _seller_lesson(db: AsyncSession, user: User, product_id: int, lesson_i
 
 
 def _lesson_out(lesson: CourseLesson, unlocked: bool = True) -> LessonOut:
+    quiz = None
+    if lesson.lesson_type == LessonType.quiz and lesson.quiz_json:
+        quiz = course_service._quiz_for_view(lesson.quiz_json, include_answers=True)
     return LessonOut(
         id=lesson.id, title=lesson.title, lesson_type=lesson.lesson_type,
         duration_seconds=lesson.duration_seconds, is_preview=lesson.is_preview,
         sort_order=lesson.sort_order, has_file=bool(lesson.storage_key),
+        hls_ready=bool(getattr(lesson, "hls_ready", False)),
         locked=not unlocked, completed=False,
         text_body=lesson.text_body if (unlocked and lesson.lesson_type == LessonType.text) else None,
+        quiz=quiz,
     )
 
 
@@ -140,6 +146,44 @@ async def lesson_content(
     return FileResponse(path, media_type=lesson.content_type or "application/octet-stream")
 
 
+@router.get("/{product_id}/lessons/{lesson_id}/hls/{filename}")
+async def lesson_hls(
+    product_id: int,
+    lesson_id: int,
+    filename: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Serve an encrypted-HLS artefact (playlist .m3u8, .ts segment, or the AES key)
+    for a video lesson. Every request — INCLUDING the decryption key — is gated by
+    the same entitlement/preview check, so the key only reaches paying buyers.
+    The player (hls.js) attaches the Bearer token to these requests.
+    """
+    if "/" in filename or ".." in filename:
+        raise HTTPException(status_code=400, detail="bad name")
+    lesson = (await db.execute(
+        select(CourseLesson)
+        .join(Course, Course.id == CourseLesson.course_id)
+        .where(CourseLesson.id == lesson_id, Course.product_id == product_id)
+    )).scalar_one_or_none()
+    if not lesson:
+        raise HTTPException(status_code=404, detail="Урок не найден")
+    if not lesson.is_preview and not await course_service.has_access(db, current_user, product_id):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Курс не приобретён")
+
+    data = digital_storage_service.read_bytes(f"hls/{lesson_id}/{filename}")
+    if data is None:
+        raise HTTPException(status_code=404, detail="Файл не найден")
+    if filename.endswith(".m3u8"):
+        ct = "application/vnd.apple.mpegurl"
+    elif filename.endswith(".ts"):
+        ct = "video/mp2t"
+    else:
+        ct = "application/octet-stream"   # the AES key
+    return Response(content=data, media_type=ct)
+
+
 @router.post("/{product_id}/lessons/{lesson_id}/complete")
 async def complete_lesson(
     product_id: int,
@@ -166,6 +210,97 @@ async def complete_lesson(
         await db.commit()
     pct = await course_service.course_progress_percent(db, current_user.id, lesson.course_id)
     return {"completed": True, "progress_percent": pct}
+
+
+@router.post("/{product_id}/lessons/{lesson_id}/quiz", response_model=QuizResultOut)
+async def submit_quiz(
+    product_id: int,
+    lesson_id: int,
+    payload: QuizSubmit,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Grade a quiz attempt server-side. Passing marks the lesson complete."""
+    if not await course_service.has_access(db, current_user, product_id):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Курс не приобретён")
+    lesson = (await db.execute(
+        select(CourseLesson)
+        .join(Course, Course.id == CourseLesson.course_id)
+        .where(CourseLesson.id == lesson_id, Course.product_id == product_id)
+    )).scalar_one_or_none()
+    if not lesson or lesson.lesson_type != LessonType.quiz:
+        raise HTTPException(status_code=404, detail="Тест не найден")
+
+    score, passed, correct, total = course_service.grade_quiz(lesson.quiz_json, payload.answers)
+    db.add(QuizAttempt(
+        user_id=current_user.id, lesson_id=lesson_id, course_id=lesson.course_id,
+        score=score, passed=passed, answers_json=json.dumps(payload.answers),
+    ))
+    if passed:
+        existing = (await db.execute(
+            select(LessonProgress).where(
+                LessonProgress.user_id == current_user.id, LessonProgress.lesson_id == lesson_id
+            )
+        )).scalar_one_or_none()
+        if not existing:
+            db.add(LessonProgress(user_id=current_user.id, lesson_id=lesson_id, course_id=lesson.course_id))
+    await db.commit()
+    return QuizResultOut(score=score, passed=passed, correct_count=correct, total=total)
+
+
+# ─── certificates ─────────────────────────────────────────────────────────────
+
+async def _issue_cert(db: AsyncSession, user: User, product_id: int):
+    if not await course_service.has_access(db, user, product_id):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Курс не приобретён")
+    product = (await db.execute(select(Product).where(Product.id == product_id))).scalar_one_or_none()
+    course = await course_service.get_course_for_product(db, product_id)
+    if not product or not course:
+        raise HTTPException(status_code=404, detail="Курс не найден")
+    cert = await certificate_service.issue(db, user, course, product)
+    if not cert:
+        raise HTTPException(status_code=400, detail="Курс ещё не завершён на 100%")
+    await db.commit()
+    return cert
+
+
+@router.get("/certificates/{code}", response_model=CertificateOut)
+async def verify_certificate(code: str, db: AsyncSession = Depends(get_db)):
+    """Public verification of a certificate by its code."""
+    cert = await certificate_service.verify(db, code)
+    if not cert:
+        raise HTTPException(status_code=404, detail="Сертификат не найден")
+    return CertificateOut(
+        code=cert.code, course_id=cert.course_id, product_id=cert.product_id,
+        course_title=cert.course_title, recipient_name=cert.recipient_name, issued_at=cert.issued_at,
+    )
+
+
+@router.get("/{product_id}/certificate", response_model=CertificateOut)
+async def get_certificate(
+    product_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    cert = await _issue_cert(db, current_user, product_id)
+    return CertificateOut(
+        code=cert.code, course_id=cert.course_id, product_id=cert.product_id,
+        course_title=cert.course_title, recipient_name=cert.recipient_name, issued_at=cert.issued_at,
+    )
+
+
+@router.get("/{product_id}/certificate/pdf")
+async def get_certificate_pdf(
+    product_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    cert = await _issue_cert(db, current_user, product_id)
+    pdf = certificate_service.render_pdf(cert)
+    return Response(
+        content=pdf, media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="certificate-{cert.code}.pdf"'},
+    )
 
 
 # ─── buyer: my courses ────────────────────────────────────────────────────────
@@ -294,6 +429,7 @@ async def add_lesson(
     lesson = CourseLesson(
         module_id=module.id, course_id=module.course_id, title=payload.title,
         lesson_type=payload.lesson_type, text_body=payload.text_body,
+        quiz_json=json.dumps(payload.quiz.model_dump()) if payload.quiz else None,
         is_preview=payload.is_preview, sort_order=payload.sort_order,
         duration_seconds=payload.duration_seconds,
     )
@@ -312,7 +448,11 @@ async def update_lesson(
     current_user: User = Depends(get_current_seller),
 ):
     lesson = await _seller_lesson(db, current_user, product_id, lesson_id)
-    for field, value in payload.model_dump(exclude_unset=True).items():
+    data = payload.model_dump(exclude_unset=True)
+    if "quiz" in data:
+        quiz = data.pop("quiz")
+        lesson.quiz_json = json.dumps(quiz) if quiz else None
+    for field, value in data.items():
         setattr(lesson, field, value)
     await db.commit()
     await db.refresh(lesson)
@@ -356,5 +496,14 @@ async def upload_lesson_file(
         digital_storage_service.delete_digital_asset(lesson.storage_key)
     lesson.storage_key = key
     lesson.content_type = file.content_type or "application/octet-stream"
+    lesson.hls_ready = False
     await db.commit()
-    return {"ok": True, "size_bytes": size}
+
+    # Video → package into encrypted HLS (AES-128) in the background.
+    if lesson.lesson_type == LessonType.video:
+        try:
+            from app.tasks.tasks import package_lesson_hls
+            package_lesson_hls.delay(lesson.id)
+        except Exception:
+            pass  # Celery/Redis unavailable (dev) — playback falls back to the direct stream
+    return {"ok": True, "size_bytes": size, "hls_queued": lesson.lesson_type == LessonType.video}

@@ -288,3 +288,83 @@ async def _loyalty_decay_async():
 def loyalty_decay():
     """Downgrade loyalty tiers for buyers inactive beyond their retention window."""
     return asyncio.run(_loyalty_decay_async())
+
+
+# ─── Course video → encrypted HLS (AES-128) packaging ────────────────────────────
+
+def _do_hls_packaging(lesson_id: int, raw_bytes: bytes) -> bool:
+    """Segment + AES-128-encrypt a video into HLS with ffmpeg (`-c copy`, no
+    re-encode → CPU-light, no GPU). Uploads playlist/segments/key to private
+    storage under hls/<lesson_id>/. Returns True on success."""
+    import os
+    import subprocess
+    import tempfile
+    from app.services import digital_storage_service
+
+    with tempfile.TemporaryDirectory() as d:
+        inp = os.path.join(d, "in.src")
+        with open(inp, "wb") as f:
+            f.write(raw_bytes)
+        with open(os.path.join(d, "enc.key"), "wb") as f:
+            f.write(os.urandom(16))
+        keyinfo = os.path.join(d, "keyinfo")
+        with open(keyinfo, "w") as f:
+            f.write("enc.key\n")                      # key URI as written into the playlist
+            f.write(os.path.join(d, "enc.key") + "\n")  # local path ffmpeg reads the key from
+
+        base = [
+            "ffmpeg", "-y", "-i", inp,
+            "-hls_time", "6", "-hls_playlist_type", "vod",
+            "-hls_key_info_file", keyinfo,
+            "-hls_segment_filename", os.path.join(d, "seg%03d.ts"),
+            os.path.join(d, "index.m3u8"),
+        ]
+        copy_cmd = base[:3] + ["-c", "copy"] + base[3:]
+        try:
+            subprocess.run(copy_cmd, check=True, capture_output=True, timeout=1800)
+        except Exception:
+            # Odd/unsupported codec: re-encode to H.264/AAC (CPU; slower, still no GPU).
+            reencode = base[:3] + ["-c:v", "libx264", "-preset", "veryfast", "-c:a", "aac"] + base[3:]
+            try:
+                subprocess.run(reencode, check=True, capture_output=True, timeout=5400)
+            except Exception:
+                return False
+
+        prefix = f"hls/{lesson_id}"
+        for name in os.listdir(d):
+            if name in ("in.src", "keyinfo"):
+                continue
+            with open(os.path.join(d, name), "rb") as f:
+                data = f.read()
+            if name.endswith(".m3u8"):
+                ct = "application/vnd.apple.mpegurl"
+            elif name.endswith(".ts"):
+                ct = "video/mp2t"
+            else:
+                ct = "application/octet-stream"
+            digital_storage_service.save_bytes(f"{prefix}/{name}", data, ct)
+        return True
+
+
+async def _package_lesson_hls_async(lesson_id: int):
+    from app.models.models import CourseLesson
+    from app.services import digital_storage_service
+
+    async with AsyncSessionLocal() as db:
+        lesson = await db.get(CourseLesson, lesson_id)
+        if not lesson or not lesson.storage_key:
+            return {"ok": False, "reason": "no source"}
+        raw = digital_storage_service.read_bytes(lesson.storage_key)
+        if not raw:
+            return {"ok": False, "reason": "source unreadable"}
+        ok = _do_hls_packaging(lesson_id, raw)
+        if ok:
+            lesson.hls_ready = True
+            await db.commit()
+        return {"ok": ok}
+
+
+@celery_app.task(name="app.tasks.tasks.package_lesson_hls")
+def package_lesson_hls(lesson_id: int):
+    """Package a course video lesson into encrypted HLS in the background."""
+    return asyncio.run(_package_lesson_hls_async(lesson_id))

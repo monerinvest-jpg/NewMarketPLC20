@@ -15,7 +15,7 @@ import type {
   PaidFeature, Promotion, AuctionStanding, AdWallet,
   PromoRule, Bundle, ProductBundle, CartPromoSummary,
   Dispute, DisputeMessage, GiftCertificate, PromoOverview, LoyaltyTier, LoyaltyStatus,
-  DigitalAsset, Entitlement, CourseDetail, MyCourse,
+  DigitalAsset, Entitlement, CourseDetail, MyCourse, QuizResult, Certificate,
 } from '@/types'
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
@@ -134,6 +134,20 @@ export const coursesApi = {
     api.get(`/courses/${productId}/lessons/${lessonId}/content`, { responseType: 'blob' }),
   completeLesson: (productId: number, lessonId: number) =>
     api.post<{ completed: boolean; progress_percent: number }>(`/courses/${productId}/lessons/${lessonId}/complete`).then(r => r.data),
+  submitQuiz: (productId: number, lessonId: number, answers: number[]) =>
+    api.post<QuizResult>(`/courses/${productId}/lessons/${lessonId}/quiz`, { answers }).then(r => r.data),
+
+  // Full URL of the encrypted-HLS playlist for hls.js (Bearer added via xhrSetup).
+  hlsPlaylistUrl: (productId: number, lessonId: number) =>
+    `${import.meta.env.VITE_API_URL || ''}/api/v1/courses/${productId}/lessons/${lessonId}/hls/index.m3u8`,
+
+  // Certificates
+  getCertificate: (productId: number) =>
+    api.get<Certificate>(`/courses/${productId}/certificate`).then(r => r.data),
+  certificatePdf: (productId: number) =>
+    api.get(`/courses/${productId}/certificate/pdf`, { responseType: 'blob' }),
+  verifyCertificate: (code: string) =>
+    api.get<Certificate>(`/courses/certificates/${code}`).then(r => r.data),
 
   // Seller course builder
   builder: (productId: number) => api.get<CourseDetail>(`/courses/${productId}/builder`).then(r => r.data),
