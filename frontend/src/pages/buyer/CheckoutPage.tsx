@@ -23,6 +23,8 @@ export default function CheckoutPage() {
   const [submitting, setSubmitting] = useState(false)
   const [couponCode, setCouponCode] = useState('')
   const [bonusToUse, setBonusToUse] = useState(0)
+  const [referralToUse, setReferralToUse] = useState(0)
+  const [referralBalance, setReferralBalance] = useState(0)
   const [deliveryMethod, setDeliveryMethod] = useState<'courier' | 'pickup'>('courier')
   const [pickupPoints, setPickupPoints] = useState<PickupPoint[]>([])
   const [pickupLoading, setPickupLoading] = useState(false)
@@ -30,6 +32,16 @@ export default function CheckoutPage() {
   const [savedAddresses, setSavedAddresses] = useState<any[]>([])
 
   useEffect(() => { fetchCart() }, [])
+
+  useEffect(() => {
+    if (user) {
+      import('@/api').then(({ usersApi }) =>
+        usersApi.getReferralStats()
+          .then((s) => setReferralBalance(parseFloat(s.referral_balance || '0')))
+          .catch(() => {})
+      )
+    }
+  }, [user])
 
   useEffect(() => {
     if (user) {
@@ -120,6 +132,7 @@ export default function CheckoutPage() {
         delivery_service: selectedService,
         coupon_code: couponCode || undefined,
         bonus_to_use: bonusToUse || undefined,
+        referral_to_use: referralToUse || undefined,
       })
       message.success('Заказ создан!')
       if (order.payment?.confirmation_url) {
@@ -140,7 +153,7 @@ export default function CheckoutPage() {
 
   const subtotal = totalPrice()
   const deliveryCost = delivery ? parseFloat(delivery.cost) : 0
-  const total = Math.max(subtotal + deliveryCost - bonusToUse, 0)
+  const total = Math.max(subtotal + deliveryCost - bonusToUse - referralToUse, 0)
 
   return (
     <div style={{ maxWidth: 800, margin: '0 auto' }}>
@@ -261,6 +274,18 @@ export default function CheckoutPage() {
               </Form.Item>
             )}
 
+            {referralBalance > 0 && (
+              <Form.Item label={`Реферальный баланс (доступно: ${referralBalance.toLocaleString('ru')} ₽) — оплата до 100%`}>
+                <InputNumber
+                  min={0}
+                  max={Math.min(referralBalance, Math.max(subtotal + deliveryCost - bonusToUse, 0))}
+                  style={{ width: '100%' }}
+                  value={referralToUse}
+                  onChange={(v) => setReferralToUse(v || 0)}
+                />
+              </Form.Item>
+            )}
+
             <Button type="primary" htmlType="submit" size="large" block loading={submitting}>
               Перейти к оплате
             </Button>
@@ -287,6 +312,12 @@ export default function CheckoutPage() {
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
               <Text>Бонусы:</Text>
               <Text style={{ color: '#52c41a' }}>−{bonusToUse.toLocaleString('ru')} ₽</Text>
+            </div>
+          )}
+          {referralToUse > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+              <Text>Реферальный баланс:</Text>
+              <Text style={{ color: '#52c41a' }}>−{referralToUse.toLocaleString('ru')} ₽</Text>
             </div>
           )}
           <Divider />

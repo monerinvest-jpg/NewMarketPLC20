@@ -1223,22 +1223,31 @@ async def process_payout(
     req.processed_by_id = current_user.id
     req.processed_at = datetime.now(timezone.utc)
 
-    # On 'paid', deduct the amount from the seller's balance
+    # On 'paid', deduct the amount from the matching balance (sales vs referral).
     if new_status == PayoutRequestStatus.paid:
-        seller = (await db.execute(select(User).where(User.id == req.user_id))).scalar_one_or_none()
-        if not seller:
-            raise HTTPException(status_code=404, detail="Продавец не найден")
-        if seller.balance < req.amount:
-            raise HTTPException(status_code=400, detail="Недостаточно средств на балансе продавца")
-        seller.balance -= req.amount
+        from app.models.models import PayoutSource
+        user = (await db.execute(select(User).where(User.id == req.user_id))).scalar_one_or_none()
+        if not user:
+            raise HTTPException(status_code=404, detail="Пользователь не найден")
+        is_referral = req.source == PayoutSource.referral
+        available = user.referral_balance if is_referral else user.balance
+        if available < req.amount:
+            raise HTTPException(status_code=400, detail="Недостаточно средств на балансе пользователя")
+        if is_referral:
+            user.referral_balance -= req.amount
+            balance_after = user.referral_balance
+        else:
+            user.balance -= req.amount
+            balance_after = user.balance
+        label = "Вывод реферальных средств" if is_referral else "Вывод средств"
         db.add(Transaction(
-            user_id=seller.id, type=TransactionType.payout, amount=-req.amount,
-            description=f"Вывод средств #{req.id}", balance_after=seller.balance,
+            user_id=user.id, type=TransactionType.payout, amount=-req.amount,
+            description=f"{label} #{req.id}", balance_after=balance_after,
         ))
         db.add(BalanceTransaction(
-            user_id=seller.id, change=-req.amount, type=BalanceTransactionType.debit,
+            user_id=user.id, change=-req.amount, type=BalanceTransactionType.debit,
             reference_type="payout", reference_id=req.id,
-            description=f"Вывод средств #{req.id}", balance_after=seller.balance,
+            description=f"{label} #{req.id}", balance_after=balance_after,
         ))
 
     from app.services.audit_service import log_action

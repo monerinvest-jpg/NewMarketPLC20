@@ -6,7 +6,7 @@ import string
 from decimal import Decimal
 from typing import Optional
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.models import (
@@ -58,143 +58,121 @@ async def register_referral(referred_user: User, referral_code: str, db: AsyncSe
     return referral
 
 
+async def _already_rewarded(db: AsyncSession, referral_id: int, order_id: int) -> bool:
+    """True if this referral already earned a reward for this order (idempotency)."""
+    rid = (await db.execute(
+        select(ReferralReward.id).where(
+            ReferralReward.referral_id == referral_id,
+            ReferralReward.order_id == order_id,
+        )
+    )).scalar_one_or_none()
+    return rid is not None
+
+
 async def process_buyer_referral_reward(order: Order, db: AsyncSession) -> None:
     """
-    Called when a buyer completes their first qualifying order.
-    Pays the referrer their buyer bonus.
+    LIFELONG referral: pays the referrer a percentage of EVERY completed order of
+    a referred buyer (not just the first). The earning goes to the referrer's
+    withdrawable referral_balance. Idempotent per (referral, order).
     """
-    result = await db.execute(
+    referral = (await db.execute(
         select(Referral).where(
             Referral.referred_user_id == order.buyer_id,
             Referral.type == ReferralType.buyer,
-            Referral.reward_paid == False,  # noqa: E712
         )
-    )
-    referral = result.scalar_one_or_none()
+    )).scalar_one_or_none()
     if not referral:
+        return
+    if await _already_rewarded(db, referral.id, order.id):
         return
 
     settings = await get_referral_settings(db)
-    min_amount = settings["referral_buyer_min_order_amount"]
-
-    if order.subtotal < min_amount:
+    if order.subtotal < settings["referral_buyer_min_order_amount"]:
         return
-
-    # Bonus is a percentage of the referred buyer's first qualifying order
-    # subtotal, credited to the referrer as bonus points. The % is admin-tunable.
     percent = settings["referral_buyer_bonus_percent"]
     bonus = (order.subtotal * percent / Decimal("100")).quantize(Decimal("0.01"))
     if bonus <= 0:
         return
 
-    # Credit bonus points to referrer
-    referrer_result = await db.execute(select(User).where(User.id == referral.referrer_id))
-    referrer = referrer_result.scalar_one_or_none()
+    referrer = (await db.execute(select(User).where(User.id == referral.referrer_id))).scalar_one_or_none()
     if not referrer:
         return
 
-    referrer.bonus_balance += bonus
-
-    reward = ReferralReward(
-        referral_id=referral.id,
-        amount=bonus,
-        type=ReferralType.buyer,
-        status="paid",
-    )
-    db.add(reward)
-
-    bal_tx = BalanceTransaction(
-        user_id=referrer.id,
-        change=bonus,
-        type=BalanceTransactionType.credit,
-        reference_type="referral",
-        reference_id=referral.id,
-        description=f"Реферальный бонус за привлечение покупателя (заказ #{order.id})",
-        balance_after=referrer.bonus_balance,
-    )
-    db.add(bal_tx)
-
+    referrer.referral_balance += bonus
+    db.add(ReferralReward(
+        referral_id=referral.id, order_id=order.id, amount=bonus,
+        type=ReferralType.buyer, status="paid",
+    ))
+    db.add(BalanceTransaction(
+        user_id=referrer.id, change=bonus, type=BalanceTransactionType.credit,
+        reference_type="referral", reference_id=order.id,
+        description=f"Реферальный доход с покупки приглашённого (заказ #{order.id})",
+        balance_after=referrer.referral_balance,
+    ))
     referral.reward_paid = True
     await db.flush()
 
 
 async def process_seller_referral_reward(order: Order, db: AsyncSession) -> None:
     """
-    Called when the first completed order of a referred seller reaches 'completed'.
-    Pays the referrer the seller cash bonus, for every distinct seller present
-    in the order (an order can contain items from multiple shops — each one
-    is checked independently rather than assuming a single seller).
+    LIFELONG referral: pays the referrer a percentage of EVERY completed sale of a
+    referred seller (not just their first), for each referred shop in the order.
+    The % is taken of that shop's own items subtotal and credited to the
+    referrer's withdrawable referral_balance. Idempotent per (referral, order).
     """
     from app.models.models import Shop, OrderItem
 
-    shop_ids_result = await db.execute(
+    shop_ids = [row[0] for row in (await db.execute(
         select(OrderItem.shop_id).where(OrderItem.order_id == order.id).distinct()
-    )
-    shop_ids = [row[0] for row in shop_ids_result.all()]
+    )).all()]
     if not shop_ids:
         return
 
+    settings = await get_referral_settings(db)
+    percent = settings["referral_seller_bonus_percent"]
+
     for shop_id in shop_ids:
-        shop_result = await db.execute(select(Shop).where(Shop.id == shop_id))
-        shop = shop_result.scalar_one_or_none()
+        shop = (await db.execute(select(Shop).where(Shop.id == shop_id))).scalar_one_or_none()
         if not shop:
             continue
-
-        result = await db.execute(
+        referral = (await db.execute(
             select(Referral).where(
                 Referral.referred_user_id == shop.owner_id,
                 Referral.type == ReferralType.seller,
-                Referral.reward_paid == False,  # noqa: E712
             )
-        )
-        referral = result.scalar_one_or_none()
-        if not referral:
+        )).scalar_one_or_none()
+        if not referral or await _already_rewarded(db, referral.id, order.id):
             continue
 
-        settings = await get_referral_settings(db)
-        # Reward is a percentage of the referred seller's first completed order
-        # subtotal, paid to the referrer's balance. The % is admin-tunable.
-        percent = settings["referral_seller_bonus_percent"]
-        reward_amount = (order.subtotal * percent / Decimal("100")).quantize(Decimal("0.01"))
+        # Percentage of THIS shop's items in the order (the referred seller's sale).
+        shop_subtotal = (await db.execute(
+            select(func.coalesce(func.sum(OrderItem.price_at_time * OrderItem.quantity), 0))
+            .where(OrderItem.order_id == order.id, OrderItem.shop_id == shop_id)
+        )).scalar_one()
+        reward_amount = (Decimal(str(shop_subtotal)) * percent / Decimal("100")).quantize(Decimal("0.01"))
         if reward_amount <= 0:
             continue
 
-        referrer_result = await db.execute(select(User).where(User.id == referral.referrer_id))
-        referrer = referrer_result.scalar_one_or_none()
+        referrer = (await db.execute(select(User).where(User.id == referral.referrer_id))).scalar_one_or_none()
         if not referrer:
             continue
 
-        referrer.balance += reward_amount
-
-        reward = ReferralReward(
-            referral_id=referral.id,
-            amount=reward_amount,
-            type=ReferralType.seller,
-            status="paid",
-        )
-        db.add(reward)
-
-        tx = Transaction(
-            user_id=referrer.id,
-            type=TransactionType.referral_reward,
-            amount=reward_amount,
-            order_id=order.id,
-            description="Реферальное вознаграждение за привлечение продавца",
-            balance_after=referrer.balance,
-        )
-        db.add(tx)
-
-        bal_tx = BalanceTransaction(
-            user_id=referrer.id,
-            change=reward_amount,
-            type=BalanceTransactionType.credit,
-            reference_type="referral",
-            reference_id=referral.id,
-            description=f"Реферальное вознаграждение за продавца (заказ #{order.id})",
-            balance_after=referrer.balance,
-        )
-        db.add(bal_tx)
-
+        referrer.referral_balance += reward_amount
+        db.add(ReferralReward(
+            referral_id=referral.id, order_id=order.id, amount=reward_amount,
+            type=ReferralType.seller, status="paid",
+        ))
+        db.add(Transaction(
+            user_id=referrer.id, type=TransactionType.referral_reward, amount=reward_amount,
+            order_id=order.id, description="Реферальный доход с продажи приглашённого продавца",
+            balance_after=referrer.referral_balance,
+        ))
+        db.add(BalanceTransaction(
+            user_id=referrer.id, change=reward_amount, type=BalanceTransactionType.credit,
+            reference_type="referral", reference_id=order.id,
+            description=f"Реферальный доход с продавца (заказ #{order.id})",
+            balance_after=referrer.referral_balance,
+        ))
         referral.reward_paid = True
         await db.flush()
     await db.flush()

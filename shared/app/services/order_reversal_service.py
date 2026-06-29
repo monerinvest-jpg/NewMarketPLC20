@@ -77,6 +77,18 @@ async def restore_order(db: AsyncSession, order: Order) -> None:
                 balance_after=buyer.promo_balance,
             ))
 
+        if getattr(order, "referral_used", None) and order.referral_used > 0:
+            buyer.referral_balance = (buyer.referral_balance or Decimal("0.00")) + order.referral_used
+            db.add(BalanceTransaction(
+                user_id=buyer.id,
+                change=order.referral_used,
+                type=BalanceTransactionType.credit,
+                reference_type="order_cancel",
+                reference_id=order.id,
+                description=f"Возврат реферального баланса по заказу #{order.id}",
+                balance_after=buyer.referral_balance,
+            ))
+
     # 4. Free up the coupon usage slot.
     if order.coupon_id:
         coupon = (await db.execute(

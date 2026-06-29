@@ -58,7 +58,13 @@ export default function AdminPayouts() {
         columns={[
           { title: '№', dataIndex: 'id', width: 60 },
           { title: 'Дата', dataIndex: 'created_at', render: (v) => dayjs(v).format('DD.MM.YYYY HH:mm') },
-          { title: 'Продавец ID', dataIndex: 'user_id' },
+          { title: 'Пользователь ID', dataIndex: 'user_id' },
+          {
+            title: 'Источник', dataIndex: 'source', width: 110,
+            render: (v) => v === 'referral'
+              ? <Tag color="purple">Рефералы</Tag>
+              : <Tag color="blue">Продажи</Tag>,
+          },
           { title: 'Сумма', dataIndex: 'amount', render: (v) => `${parseFloat(v).toLocaleString('ru')} ₽` },
           { title: 'Реквизиты', dataIndex: 'payout_details' },
           { title: 'Статус', dataIndex: 'status', render: (v) => <Tag color={statusLabels[v]?.color}>{statusLabels[v]?.label}</Tag> },

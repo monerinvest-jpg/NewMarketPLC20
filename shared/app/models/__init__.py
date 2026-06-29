@@ -23,7 +23,7 @@ from app.models.models import (
     FiscalReceipt, FiscalReceiptType, FiscalReceiptStatus,
     ProductType, CategoryKind, DigitalAsset, Entitlement,
     LessonType, Course, CourseModule, CourseLesson, LessonProgress,
-    QuizAttempt, Certificate,
+    QuizAttempt, Certificate, PayoutSource, WithdrawalAccount,
 )
 
 __all__ = [
@@ -51,5 +51,5 @@ __all__ = [
     "FiscalReceipt", "FiscalReceiptType", "FiscalReceiptStatus",
     "ProductType", "CategoryKind", "DigitalAsset", "Entitlement",
     "LessonType", "Course", "CourseModule", "CourseLesson", "LessonProgress",
-    "QuizAttempt", "Certificate",
+    "QuizAttempt", "Certificate", "PayoutSource", "WithdrawalAccount",
 ]

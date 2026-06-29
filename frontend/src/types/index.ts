@@ -427,6 +427,7 @@ export interface ReferralStats {
   paid_rewards: number
   bonus_balance: string
   balance: string
+  referral_balance: string
 }
 
 export interface Token {

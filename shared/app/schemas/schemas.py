@@ -488,6 +488,8 @@ class OrderCreate(BaseModel):
     delivery_service: str = "cdek"
     coupon_code: Optional[str] = None
     bonus_to_use: Decimal = Field(default=Decimal("0"), ge=0)
+    # Referral earnings to spend; can cover up to 100% of the order.
+    referral_to_use: Decimal = Field(default=Decimal("0"), ge=0)
 
 
 class OrderStatusUpdate(BaseModel):
@@ -982,6 +984,7 @@ class PayoutRequestOut(OrmBase):
     id: int
     user_id: int
     amount: Decimal
+    source: str = "sales"
     status: str
     payout_details: str
     admin_comment: Optional[str]

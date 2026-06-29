@@ -192,6 +192,12 @@ class PayoutRequestStatus(str, enum.Enum):
     paid = "paid"
 
 
+class PayoutSource(str, enum.Enum):
+    """Which balance a payout request draws from."""
+    sales = "sales"        # seller's sales earnings (User.balance)
+    referral = "referral"  # referral earnings (User.referral_balance)
+
+
 class BalanceTransactionType(str, enum.Enum):
     credit = "credit"
     debit = "debit"
@@ -295,6 +301,9 @@ class User(Base):
     bonus_balance: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=Decimal("0.00"), nullable=False)
     # Promo balance funded by gift certificates / promo campaigns (spendable at checkout).
     promo_balance: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=Decimal("0.00"), nullable=False)
+    # Referral earnings (real money): accrued lifelong from referred users' orders,
+    # withdrawable to a bank account (with tax status) and spendable up to 100% at checkout.
+    referral_balance: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=Decimal("0.00"), nullable=False, server_default="0")
     # Loyalty program state (tier by qualifying spend, with inactivity decay).
     loyalty_tier_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("loyalty_tier.id"), nullable=True)
     qualifying_spend: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=Decimal("0.00"), nullable=False)
@@ -713,6 +722,8 @@ class Order(Base):
     commission_percent_used: Mapped[Decimal] = mapped_column(Numeric(5, 2), default=Decimal("10.00"), nullable=False)
     bonus_used: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=Decimal("0.00"), nullable=False)
     promo_used: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=Decimal("0.00"), nullable=False)
+    # Referral earnings spent on this order (covers up to 100% of the payable).
+    referral_used: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=Decimal("0.00"), nullable=False, server_default="0")
     status: Mapped[OrderStatus] = mapped_column(Enum(OrderStatus), default=OrderStatus.pending_payment, nullable=False)
     delivery_address: Mapped[str] = mapped_column(Text, nullable=False)
     coupon_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("coupon.id"), nullable=True)
@@ -973,12 +984,35 @@ class ReferralReward(Base):
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     referral_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("referral.id"), nullable=False)
+    # The order this reward was earned from. Lifelong referrals pay out on every
+    # completed order, so (referral_id, order_id) is unique to prevent double-pay.
+    order_id: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("order.id"), nullable=True)
     amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     type: Mapped[ReferralType] = mapped_column(Enum(ReferralType), nullable=False)
     status: Mapped[str] = mapped_column(String(20), default="pending", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
 
     referral: Mapped["Referral"] = relationship("Referral", back_populates="rewards")
+
+    __table_args__ = (
+        UniqueConstraint("referral_id", "order_id", name="uq_referral_reward_referral_order"),
+    )
+
+
+class WithdrawalAccount(Base):
+    """A user's bank/tax details for withdrawing referral earnings. Any user
+    (not just sellers) can fill this; a valid tax_regime (self-employed/ИП/ООО)
+    is required to request a referral payout."""
+    __tablename__ = "withdrawal_account"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("user.id"), unique=True, nullable=False)
+    tax_regime: Mapped[TaxRegime] = mapped_column(Enum(TaxRegime), nullable=False)
+    legal_name: Mapped[str] = mapped_column(String(255), nullable=False)   # ФИО / наименование
+    inn: Mapped[str] = mapped_column(String(12), nullable=False)
+    account_details: Mapped[str] = mapped_column(String(512), nullable=False)  # счёт/карта/реквизиты
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False)
 
 
 class BalanceTransaction(Base):
@@ -1338,6 +1372,8 @@ class PayoutRequest(Base):
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("user.id"), nullable=False)
     amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    # Which balance this withdrawal draws from (sales earnings vs referral earnings).
+    source: Mapped[PayoutSource] = mapped_column(Enum(PayoutSource), default=PayoutSource.sales, nullable=False, server_default="sales")
     status: Mapped[PayoutRequestStatus] = mapped_column(Enum(PayoutRequestStatus), default=PayoutRequestStatus.pending, nullable=False)
     # Free-form payout destination (card number masked, bank account, etc.)
     payout_details: Mapped[str] = mapped_column(String(512), nullable=False)

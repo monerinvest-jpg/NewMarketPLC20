@@ -57,6 +57,16 @@ export const usersApi = {
   getReferralStats: () => api.get<ReferralStats>('/users/me/referral-stats').then(r => r.data),
 
   getBalanceHistory: () => api.get('/users/me/balance-history').then(r => r.data),
+
+  // Referral withdrawal (account requisites + payout requests)
+  getWithdrawalAccount: () =>
+    api.get<{ referral_balance: string; account: { tax_regime: string; legal_name: string; inn: string; account_details: string } | null }>('/users/me/withdrawal-account').then(r => r.data),
+  setWithdrawalAccount: (data: { tax_regime: string; legal_name: string; inn: string; account_details: string }) =>
+    api.put('/users/me/withdrawal-account', data).then(r => r.data),
+  listReferralWithdrawals: () =>
+    api.get<Array<{ id: number; amount: string; status: string; created_at: string; admin_comment?: string }>>('/users/me/referral-withdrawals').then(r => r.data),
+  requestReferralWithdrawal: (amount: number) =>
+    api.post('/users/me/referral-withdrawals', { amount }).then(r => r.data),
 }
 
 // ─── Products ─────────────────────────────────────────────────────────────────
@@ -234,7 +244,7 @@ export const cartApi = {
 export const ordersApi = {
   create: (data: {
     delivery_address: string; city_to: string;
-    coupon_code?: string; bonus_to_use?: number
+    coupon_code?: string; bonus_to_use?: number; referral_to_use?: number
   }) => api.post<Order>('/orders', data).then(r => r.data),
 
   list: (params?: { page?: number; page_size?: number }) =>

@@ -1,6 +1,8 @@
 """
 Favorites, reports, delivery, categories, user profile endpoints.
 """
+from decimal import Decimal
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy import select
@@ -223,7 +225,132 @@ async def get_referral_stats(
         "paid_rewards": paid_rewards,
         "bonus_balance": current_user.bonus_balance,
         "balance": current_user.balance,
+        "referral_balance": current_user.referral_balance,
     }
+
+
+class WithdrawalAccountIn(BaseModel):
+    tax_regime: str          # self_employed | individual | company
+    legal_name: str
+    inn: str
+    account_details: str
+
+
+class ReferralWithdrawalCreate(BaseModel):
+    amount: Decimal
+
+
+@users_router.get("/me/withdrawal-account")
+async def get_withdrawal_account(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Referral balance + the user's withdrawal (tax/bank) details, if set."""
+    from app.models.models import WithdrawalAccount
+    acc = (await db.execute(
+        select(WithdrawalAccount).where(WithdrawalAccount.user_id == current_user.id)
+    )).scalar_one_or_none()
+    return {
+        "referral_balance": current_user.referral_balance,
+        "account": None if not acc else {
+            "tax_regime": acc.tax_regime.value,
+            "legal_name": acc.legal_name,
+            "inn": acc.inn,
+            "account_details": acc.account_details,
+        },
+    }
+
+
+@users_router.put("/me/withdrawal-account")
+async def set_withdrawal_account(
+    payload: WithdrawalAccountIn,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    from app.models.models import WithdrawalAccount, TaxRegime
+    try:
+        regime = TaxRegime(payload.tax_regime)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Неверный налоговый статус")
+    acc = (await db.execute(
+        select(WithdrawalAccount).where(WithdrawalAccount.user_id == current_user.id)
+    )).scalar_one_or_none()
+    if not acc:
+        acc = WithdrawalAccount(user_id=current_user.id, tax_regime=regime,
+                                legal_name=payload.legal_name, inn=payload.inn,
+                                account_details=payload.account_details)
+        db.add(acc)
+    else:
+        acc.tax_regime = regime
+        acc.legal_name = payload.legal_name
+        acc.inn = payload.inn
+        acc.account_details = payload.account_details
+    await db.commit()
+    return {"ok": True}
+
+
+@users_router.get("/me/referral-withdrawals")
+async def my_referral_withdrawals(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    from app.models.models import PayoutRequest, PayoutSource
+    reqs = (await db.execute(
+        select(PayoutRequest).where(
+            PayoutRequest.user_id == current_user.id,
+            PayoutRequest.source == PayoutSource.referral,
+        ).order_by(PayoutRequest.created_at.desc())
+    )).scalars().all()
+    return [
+        {"id": r.id, "amount": r.amount, "status": r.status.value,
+         "created_at": r.created_at.isoformat(), "admin_comment": r.admin_comment}
+        for r in reqs
+    ]
+
+
+@users_router.post("/me/referral-withdrawals", status_code=201)
+async def request_referral_withdrawal(
+    payload: ReferralWithdrawalCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Withdraw referral earnings to the user's bank account. Requires a withdrawal
+    account with a tax status (self-employed/ИП/ООО). The amount is validated and
+    reserved against referral_balance; it is deducted when admin marks it paid.
+    """
+    from app.models.models import WithdrawalAccount, PayoutRequest, PayoutSource, PayoutRequestStatus
+
+    acc = (await db.execute(
+        select(WithdrawalAccount).where(WithdrawalAccount.user_id == current_user.id)
+    )).scalar_one_or_none()
+    if not acc:
+        raise HTTPException(status_code=400, detail="Сначала укажите реквизиты и налоговый статус (самозанятый/ИП/ООО)")
+    if payload.amount <= 0:
+        raise HTTPException(status_code=400, detail="Сумма должна быть положительной")
+    if payload.amount > current_user.referral_balance:
+        raise HTTPException(status_code=400, detail=f"Сумма превышает реферальный баланс ({current_user.referral_balance} ₽)")
+
+    pending = (await db.execute(
+        select(PayoutRequest).where(
+            PayoutRequest.user_id == current_user.id,
+            PayoutRequest.source == PayoutSource.referral,
+            PayoutRequest.status.in_([PayoutRequestStatus.pending, PayoutRequestStatus.approved]),
+        )
+    )).scalars().all()
+    reserved = sum((p.amount for p in pending), Decimal("0"))
+    if reserved + payload.amount > current_user.referral_balance:
+        raise HTTPException(status_code=400, detail="С учётом уже запрошенных выводов сумма превышает баланс")
+
+    details = f"{acc.tax_regime.value} • {acc.legal_name} • ИНН {acc.inn} • {acc.account_details}"
+    req = PayoutRequest(
+        user_id=current_user.id, amount=payload.amount, source=PayoutSource.referral,
+        payout_details=details, status=PayoutRequestStatus.pending,
+    )
+    db.add(req)
+    await db.commit()
+    await db.refresh(req)
+    return {"id": req.id, "amount": req.amount, "status": req.status.value}
 
 
 @users_router.get("/me/balance-history")

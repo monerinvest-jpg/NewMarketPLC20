@@ -212,6 +212,25 @@ async def create_order(
         )
         total_price = (total_price - promo_used).quantize(Decimal("0.01"))
 
+    # 7c. Referral earnings can pay up to 100% of the remaining total. To respect
+    # the gateway's 1₽ minimum, the leftover is forced to be either 0 (fully paid)
+    # or ≥ 1.00 (paid via gateway).
+    referral_used = Decimal("0.00")
+    want_ref = min(payload.referral_to_use or Decimal("0.00"), current_user.referral_balance or Decimal("0.00"))
+    if want_ref > 0 and total_price > 0:
+        use = min(want_ref, total_price)
+        remainder = total_price - use
+        if Decimal("0.00") < remainder < Decimal("1.00"):
+            if want_ref >= total_price:
+                use = total_price                       # fully cover
+            else:
+                use = max(Decimal("0.00"), total_price - Decimal("1.00"))  # leave 1₽ for gateway
+        referral_used = use.quantize(Decimal("0.01"))
+        current_user.referral_balance = (current_user.referral_balance - referral_used).quantize(Decimal("0.01"))
+        total_price = (total_price - referral_used).quantize(Decimal("0.01"))
+
+    free_order = total_price <= Decimal("0.00")
+
     # 8. Create order
     order = Order(
         buyer_id=current_user.id,
@@ -223,6 +242,7 @@ async def create_order(
         commission_percent_used=blended_commission_percent,
         bonus_used=bonus_to_use,
         promo_used=promo_used,
+        referral_used=referral_used,
         coupon_discount=coupon_discount,
         status=OrderStatus.pending_payment,
         delivery_address=payload.delivery_address,
@@ -301,11 +321,62 @@ async def create_order(
         )
         db.add(bal_tx)
 
+    # 11b. Ledger entry for referral balance spent on this order
+    if referral_used > 0:
+        db.add(BalanceTransaction(
+            user_id=current_user.id,
+            change=-referral_used,
+            type=BalanceTransactionType.debit,
+            reference_type="order",
+            reference_id=order.id,
+            description=f"Оплата реферальным балансом по заказу #{order.id}",
+            balance_after=current_user.referral_balance,
+        ))
+
     # 12. Clear cart
     for item in cart_items:
         await db.delete(item)
 
     await db.flush()
+
+    # 13/14 (free order): the referral balance fully covered the total — no
+    # gateway charge. Mark it paid, grant any digital access, and complete a
+    # digital-only order immediately (mirrors the YooKassa success webhook).
+    if free_order:
+        from datetime import datetime, timezone
+        payment = Payment(
+            order_id=order.id, gateway=PaymentGateway.yookassa, amount=Decimal("0.00"),
+            status=PaymentStatus.succeeded, paid_at=datetime.now(timezone.utc),
+        )
+        db.add(payment)
+        order.status = OrderStatus.paid
+        await db.flush()
+        order_full = (await db.execute(
+            select(Order)
+            .options(selectinload(Order.items).selectinload(OrderItem.product))
+            .where(Order.id == order.id)
+        )).scalar_one()
+        from app.services import entitlement_service
+        await entitlement_service.grant_for_order(db, order_full)
+        if entitlement_service.order_is_digital_only(order_full):
+            order.status = OrderStatus.completed
+            await payout_sellers_for_order(order_full, db)
+            await process_buyer_referral_reward(order_full, db)
+            await process_seller_referral_reward(order_full, db)
+            from app.services.loyalty_service import award_cashback_for_order
+            await award_cashback_for_order(order_full, db)
+        await db.commit()
+        await db.refresh(order)
+        result_obj = await db.execute(
+            select(Order)
+            .options(
+                selectinload(Order.items).selectinload(OrderItem.product).selectinload(Product.images),
+                selectinload(Order.payment),
+                selectinload(Order.delivery_info),
+            )
+            .where(Order.id == order.id)
+        )
+        return result_obj.scalar_one()
 
     # 13. Build the 54-ФЗ fiscal receipt (приход) so YooKassa registers it in
     # the ОФД automatically once the payment succeeds.
