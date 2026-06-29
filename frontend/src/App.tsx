@@ -25,6 +25,9 @@ const FavoritesPage = lazy(() => import('./pages/buyer/FavoritesPage'))
 const ProfilePage = lazy(() => import('./pages/buyer/ProfilePage'))
 const ReferralPage = lazy(() => import('./pages/buyer/ReferralPage'))
 const MyDownloadsPage = lazy(() => import('./pages/buyer/MyDownloadsPage'))
+const LearningPage = lazy(() => import('./pages/buyer/LearningPage'))
+const CoursePlayerPage = lazy(() => import('./pages/buyer/CoursePlayerPage'))
+const SellerCourseBuilder = lazy(() => import('./pages/seller/SellerCourseBuilder'))
 
 // Seller pages
 const SellerDashboard = lazy(() => import('./pages/seller/SellerDashboard'))
@@ -131,6 +134,8 @@ function App() {
                 <Route path="/orders" element={<OrdersPage />} />
                 <Route path="/orders/:id" element={<OrderDetailPage />} />
                 <Route path="/my/downloads" element={<MyDownloadsPage />} />
+                <Route path="/learning" element={<LearningPage />} />
+                <Route path="/learn/:productId" element={<CoursePlayerPage />} />
                 <Route path="/favorites" element={<FavoritesPage />} />
                 <Route path="/profile" element={<ProfilePage />} />
                 <Route path="/referral" element={<ReferralPage />} />
@@ -158,6 +163,7 @@ function App() {
               <Route element={<ProtectedRoute roles={['seller', 'superadmin']} />}>
                 <Route path="/seller" element={<SellerDashboard />} />
                 <Route path="/seller/products" element={<SellerProducts />} />
+                <Route path="/seller/courses/:productId" element={<SellerCourseBuilder />} />
                 <Route path="/seller/orders" element={<SellerOrders />} />
                 <Route path="/seller/shop" element={<SellerShopSettings />} />
                 <Route path="/seller/reviews" element={<SellerReviews />} />

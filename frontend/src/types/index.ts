@@ -139,6 +139,53 @@ export interface Entitlement {
   files: EntitlementFile[]
 }
 
+// ─── Courses / LMS ──────────────────────────────────────────────
+export type LessonType = 'video' | 'pdf' | 'text'
+
+export interface CourseLessonNode {
+  id: number
+  title: string
+  lesson_type: LessonType
+  duration_seconds: number
+  is_preview: boolean
+  sort_order: number
+  has_file: boolean
+  locked: boolean
+  completed: boolean
+  text_body?: string | null
+}
+
+export interface CourseModuleNode {
+  id: number
+  title: string
+  sort_order: number
+  lessons: CourseLessonNode[]
+}
+
+export interface CourseDetail {
+  id: number
+  product_id: number
+  shop_id: number
+  title: string
+  slug?: string
+  level?: string | null
+  language?: string | null
+  has_intro_video: boolean
+  enrolled: boolean
+  total_lessons: number
+  completed_lessons: number
+  progress_percent: number
+  modules: CourseModuleNode[]
+}
+
+export interface MyCourse {
+  product_id: number
+  title: string
+  slug?: string
+  progress_percent: number
+  course_id: number | null
+}
+
 export interface Product {
   id: number
   shop_id: number

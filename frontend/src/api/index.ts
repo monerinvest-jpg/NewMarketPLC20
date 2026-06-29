@@ -15,7 +15,7 @@ import type {
   PaidFeature, Promotion, AuctionStanding, AdWallet,
   PromoRule, Bundle, ProductBundle, CartPromoSummary,
   Dispute, DisputeMessage, GiftCertificate, PromoOverview, LoyaltyTier, LoyaltyStatus,
-  DigitalAsset, Entitlement,
+  DigitalAsset, Entitlement, CourseDetail, MyCourse,
 } from '@/types'
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
@@ -123,6 +123,45 @@ export const libraryApi = {
   // Authenticated download endpoint; returns a Blob (Bearer token attached by interceptor).
   download: (productId: number, assetId: number) =>
     api.get(`/library/${productId}/files/${assetId}`, { responseType: 'blob' }),
+}
+
+// ─── Courses / LMS ──────────────────────────────────────────────────────────────
+export const coursesApi = {
+  // Public/buyer course detail + curriculum (gated)
+  get: (productId: number) => api.get<CourseDetail>(`/courses/${productId}`).then(r => r.data),
+  // Lesson content: text → JSON; video/pdf → Blob (Bearer attached by interceptor)
+  lessonContent: (productId: number, lessonId: number) =>
+    api.get(`/courses/${productId}/lessons/${lessonId}/content`, { responseType: 'blob' }),
+  completeLesson: (productId: number, lessonId: number) =>
+    api.post<{ completed: boolean; progress_percent: number }>(`/courses/${productId}/lessons/${lessonId}/complete`).then(r => r.data),
+
+  // Seller course builder
+  builder: (productId: number) => api.get<CourseDetail>(`/courses/${productId}/builder`).then(r => r.data),
+  updateSettings: (productId: number, data: { level?: string; language?: string }) =>
+    api.put<CourseDetail>(`/courses/${productId}/settings`, data).then(r => r.data),
+  addModule: (productId: number, data: { title: string; sort_order?: number }) =>
+    api.post(`/courses/${productId}/modules`, data).then(r => r.data),
+  updateModule: (productId: number, moduleId: number, data: { title?: string; sort_order?: number }) =>
+    api.put(`/courses/${productId}/modules/${moduleId}`, data).then(r => r.data),
+  deleteModule: (productId: number, moduleId: number) =>
+    api.delete(`/courses/${productId}/modules/${moduleId}`),
+  addLesson: (productId: number, moduleId: number, data: { title: string; lesson_type: string; text_body?: string; is_preview?: boolean; sort_order?: number; duration_seconds?: number }) =>
+    api.post(`/courses/${productId}/modules/${moduleId}/lessons`, data).then(r => r.data),
+  updateLesson: (productId: number, lessonId: number, data: Partial<{ title: string; text_body: string; is_preview: boolean; sort_order: number; duration_seconds: number }>) =>
+    api.put(`/courses/${productId}/lessons/${lessonId}`, data).then(r => r.data),
+  deleteLesson: (productId: number, lessonId: number) =>
+    api.delete(`/courses/${productId}/lessons/${lessonId}`),
+  uploadLessonFile: (productId: number, lessonId: number, file: File) => {
+    const form = new FormData()
+    form.append('file', file)
+    return api.post(`/courses/${productId}/lessons/${lessonId}/file`, form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }).then(r => r.data)
+  },
+}
+
+export const learningApi = {
+  myCourses: () => api.get<MyCourse[]>('/learning').then(r => r.data),
 }
 
 // ─── Shops ────────────────────────────────────────────────────────────────────

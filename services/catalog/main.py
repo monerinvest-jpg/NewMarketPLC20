@@ -6,6 +6,7 @@ Kong prefixes: /api/v1/products, /shops, /reviews, /categories, /catalog,
 from app.service_factory import create_service_app
 
 from app.api.v1.endpoints.products import router as products_router
+from app.api.v1.endpoints.courses import router as courses_router, learning_router
 from app.api.v1.endpoints.shops import router as shops_router
 from app.api.v1.endpoints.reviews import router as reviews_router
 from app.api.v1.endpoints.catalog_extra import router as catalog_extra_router
@@ -25,6 +26,8 @@ app = create_service_app(
     "catalog",
     [
         products_router,
+        courses_router,
+        learning_router,
         products_extra_router,
         shops_router,
         reviews_router,

@@ -36,6 +36,7 @@ async def list_products(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     category_id: Optional[int] = None,
+    product_type: Optional[str] = Query(None, pattern="^(physical|digital|course)$"),
     q: Optional[str] = None,
     min_price: Optional[float] = None,
     max_price: Optional[float] = None,
@@ -52,6 +53,8 @@ async def list_products(
 
     if category_id:
         query = query.where(Product.category_id == category_id)
+    if product_type:
+        query = query.where(Product.product_type == product_type)
     if q:
         query = query.where(
             or_(

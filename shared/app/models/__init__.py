@@ -22,6 +22,7 @@ from app.models.models import (
     GiftCertificate, GiftCertificateStatus, PromoBalanceTransaction, LoyaltyTier,
     FiscalReceipt, FiscalReceiptType, FiscalReceiptStatus,
     ProductType, CategoryKind, DigitalAsset, Entitlement,
+    LessonType, Course, CourseModule, CourseLesson, LessonProgress,
 )
 
 __all__ = [
@@ -48,4 +49,5 @@ __all__ = [
     "GiftCertificate", "GiftCertificateStatus", "PromoBalanceTransaction", "LoyaltyTier",
     "FiscalReceipt", "FiscalReceiptType", "FiscalReceiptStatus",
     "ProductType", "CategoryKind", "DigitalAsset", "Entitlement",
+    "LessonType", "Course", "CourseModule", "CourseLesson", "LessonProgress",
 ]

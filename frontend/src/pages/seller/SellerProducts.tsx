@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   Table, Button, Modal, Form, Input, InputNumber, Select,
   Tag, Upload, message, Space, Popconfirm, Typography
@@ -24,6 +25,7 @@ const statusLabels: Record<string, { label: string; color: string }> = {
 }
 
 export default function SellerProducts() {
+  const navigate = useNavigate()
   const [products, setProducts] = useState<Product[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
@@ -224,9 +226,12 @@ export default function SellerProducts() {
             render: (s) => <Tag color={statusLabels[s]?.color}>{statusLabels[s]?.label}</Tag>,
           },
           {
-            title: 'Действия', width: 120,
+            title: 'Действия', width: 170,
             render: (_, p) => (
               <Space>
+                {p.product_type === 'course' && (
+                  <Button size="small" onClick={() => navigate(`/seller/courses/${p.id}`)}>Курс</Button>
+                )}
                 <Button size="small" icon={<EditOutlined />} onClick={() => openEdit(p)} />
                 <Popconfirm title="Удалить товар?" onConfirm={() => handleDelete(p.id)}>
                   <Button size="small" danger icon={<DeleteOutlined />} />

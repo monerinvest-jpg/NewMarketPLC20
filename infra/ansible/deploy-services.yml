@@ -152,7 +152,8 @@
         priority: 0
       catalog:
         port: 8002
-        paths: ["/api/v1/products", "/api/v1/shops", "/api/v1/reviews", "/api/v1/categories",
+        paths: ["/api/v1/products", "/api/v1/courses", "/api/v1/learning", "/api/v1/shops",
+                "/api/v1/reviews", "/api/v1/categories",
                 "/api/v1/variants", "/api/v1/attributes", "/api/v1/questions", "/api/v1/home",
                 "/api/v1/recommendations", "/api/v1/favorites", "/api/v1/catalog",
                 "/api/v1/sitemap.xml", "/uploads"]

@@ -72,6 +72,13 @@ class CategoryKind(str, enum.Enum):
     course = "course"
 
 
+class LessonType(str, enum.Enum):
+    """Kind of content in a course lesson."""
+    video = "video"   # private video file, streamed to entitled buyers
+    pdf = "pdf"       # private PDF, shown in the protected reader
+    text = "text"     # inline rich text/HTML stored in the DB
+
+
 class ShopStatus(str, enum.Enum):
     """Moderation lifecycle of a seller's shop."""
     pending = "pending"
@@ -523,6 +530,102 @@ class Entitlement(Base):
         UniqueConstraint("user_id", "product_id", "order_id", name="uq_entitlement_user_product_order"),
         Index("ix_entitlement_user_id", "user_id"),
         Index("ix_entitlement_product_id", "product_id"),
+    )
+
+
+class Course(Base):
+    """The LMS structure of a course-type product. One Course per course Product.
+
+    Access is governed by the buyer's Entitlement to `product_id` (granted on
+    purchase), so courses reuse the same purchase/payment flow as digital goods.
+    """
+    __tablename__ = "course"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    product_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("product.id"), nullable=False, unique=True)
+    shop_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("shop.id"), nullable=False)
+    level: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)        # beginner/intermediate/advanced
+    language: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
+    intro_video_key: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)  # private promo video
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False)
+
+    product: Mapped["Product"] = relationship("Product")
+    modules: Mapped[List["CourseModule"]] = relationship(
+        "CourseModule", back_populates="course", cascade="all, delete-orphan",
+        order_by="CourseModule.sort_order",
+    )
+
+    __table_args__ = (
+        Index("ix_course_shop_id", "shop_id"),
+    )
+
+
+class CourseModule(Base):
+    """A section of a course, grouping lessons."""
+    __tablename__ = "course_module"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    course_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("course.id"), nullable=False)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+
+    course: Mapped["Course"] = relationship("Course", back_populates="modules")
+    lessons: Mapped[List["CourseLesson"]] = relationship(
+        "CourseLesson", back_populates="module", cascade="all, delete-orphan",
+        order_by="CourseLesson.sort_order",
+    )
+
+    __table_args__ = (
+        Index("ix_course_module_course_id", "course_id"),
+    )
+
+
+class CourseLesson(Base):
+    """A single lesson: a private video/PDF file or inline text.
+
+    Video/PDF files are stored privately (same storage as digital assets) and
+    delivered only to entitled buyers via a gated stream — never a public URL.
+    `is_preview` lessons are free to watch before purchase.
+    """
+    __tablename__ = "course_lesson"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    module_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("course_module.id"), nullable=False)
+    course_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("course.id"), nullable=False)  # denormalised
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    lesson_type: Mapped[LessonType] = mapped_column(Enum(LessonType), nullable=False)
+    # video/pdf: private storage key + content type; text: text_body holds HTML.
+    storage_key: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
+    content_type: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    text_body: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    duration_seconds: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    is_preview: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+
+    module: Mapped["CourseModule"] = relationship("CourseModule", back_populates="lessons")
+
+    __table_args__ = (
+        Index("ix_course_lesson_module_id", "module_id"),
+        Index("ix_course_lesson_course_id", "course_id"),
+    )
+
+
+class LessonProgress(Base):
+    """A buyer's completion state for a lesson, for progress tracking."""
+    __tablename__ = "lesson_progress"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("user.id"), nullable=False)
+    lesson_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("course_lesson.id"), nullable=False)
+    course_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("course.id"), nullable=False)
+    completed: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    completed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "lesson_id", name="uq_lesson_progress_user_lesson"),
+        Index("ix_lesson_progress_user_course", "user_id", "course_id"),
     )
 
 

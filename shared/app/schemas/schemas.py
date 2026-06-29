@@ -10,7 +10,7 @@ from pydantic import BaseModel, EmailStr, Field, field_validator, model_validato
 from app.models.models import (
     BalanceTransactionType, DiscountType, FiscalReceiptStatus, FiscalReceiptType,
     OrderStatus, PaymentGateway,
-    PaymentStatus, ProductStatus, ProductType, CategoryKind, ReferralType, ReportStatus,
+    PaymentStatus, ProductStatus, ProductType, CategoryKind, LessonType, ReferralType, ReportStatus,
     TransactionType, UserRole, ReviewStatus,
 )
 
@@ -284,6 +284,78 @@ class EntitlementOut(BaseModel):
     revoked: bool
     download_count: int
     files: List[EntitlementFileOut] = []
+
+
+# ─────────────────────────────────────────────
+# Courses / LMS
+# ─────────────────────────────────────────────
+
+class CourseUpsert(BaseModel):
+    level: Optional[str] = None
+    language: Optional[str] = None
+
+
+class ModuleCreate(BaseModel):
+    title: str = Field(min_length=1)
+    sort_order: int = 0
+
+
+class ModuleUpdate(BaseModel):
+    title: Optional[str] = None
+    sort_order: Optional[int] = None
+
+
+class LessonCreate(BaseModel):
+    title: str = Field(min_length=1)
+    lesson_type: LessonType
+    text_body: Optional[str] = None       # for text lessons
+    is_preview: bool = False
+    sort_order: int = 0
+    duration_seconds: int = 0
+
+
+class LessonUpdate(BaseModel):
+    title: Optional[str] = None
+    text_body: Optional[str] = None
+    is_preview: Optional[bool] = None
+    sort_order: Optional[int] = None
+    duration_seconds: Optional[int] = None
+
+
+class LessonOut(BaseModel):
+    id: int
+    title: str
+    lesson_type: LessonType
+    duration_seconds: int
+    is_preview: bool
+    sort_order: int
+    has_file: bool = False
+    locked: bool = True          # true unless the requester is entitled or it's a preview
+    completed: bool = False
+    text_body: Optional[str] = None   # included only when unlocked and type=text
+
+
+class ModuleOut(BaseModel):
+    id: int
+    title: str
+    sort_order: int
+    lessons: List[LessonOut] = []
+
+
+class CourseOut(BaseModel):
+    id: int
+    product_id: int
+    shop_id: int
+    title: str
+    slug: Optional[str] = None
+    level: Optional[str] = None
+    language: Optional[str] = None
+    has_intro_video: bool = False
+    enrolled: bool = False
+    total_lessons: int = 0
+    completed_lessons: int = 0
+    progress_percent: int = 0
+    modules: List[ModuleOut] = []
 
 
 class ProductListOut(OrmBase):
