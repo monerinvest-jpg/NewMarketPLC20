@@ -2,6 +2,8 @@ import { useEffect, Suspense, lazy } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { ConfigProvider, Spin } from 'antd'
 import ruRU from 'antd/locale/ru_RU'
+import enUS from 'antd/locale/en_US'
+import { useTranslation } from 'react-i18next'
 import { useAuthStore } from './store/authStore'
 import MainLayout from './components/layout/MainLayout'
 import AdminLayout from './components/layout/AdminLayout'
@@ -126,6 +128,7 @@ const antdTheme = {
 
 function App() {
   const { fetchMe, accessToken } = useAuthStore()
+  const { i18n } = useTranslation()
 
   useEffect(() => {
     if (accessToken) {
@@ -134,7 +137,7 @@ function App() {
   }, [])
 
   return (
-    <ConfigProvider locale={ruRU} theme={antdTheme}>
+    <ConfigProvider locale={i18n.language === 'en' ? enUS : ruRU} theme={antdTheme}>
       <BrowserRouter>
         <Suspense fallback={<div className="flex items-center justify-center h-screen"><Spin size="large" /></div>}>
           <Routes>

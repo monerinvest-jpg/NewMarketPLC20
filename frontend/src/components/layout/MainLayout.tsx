@@ -13,6 +13,7 @@ import { useAuthStore } from '@/store/authStore'
 import { useCartStore } from '@/store/cartStore'
 import { useEffect, useState } from 'react'
 import { useNavigate as useNav } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 
 const { Header, Content, Footer } = Layout
 
@@ -22,6 +23,7 @@ export default function MainLayout() {
   const compareCount = useCompareStore((s) => s.items.length)
   const { current: currentCurrency, rates, setCurrent, setRates } = useCurrencyStore()
   const navigate = useNavigate()
+  const { t, i18n } = useTranslation()
   const [searchQuery, setSearchQuery] = useState('')
 
   useEffect(() => {
@@ -150,7 +152,7 @@ export default function MainLayout() {
 
         {/* Search */}
         <Input.Search
-          placeholder="Поиск изделий ручной работы..."
+          placeholder={t('header.search')}
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           onSearch={handleSearch}
@@ -161,8 +163,15 @@ export default function MainLayout() {
         {/* Nav */}
         <Space size={8}>
           <Link to="/catalog">
-            <Button type="text">Каталог</Button>
+            <Button type="text">{t('nav.catalog')}</Button>
           </Link>
+
+          <Select
+            value={i18n.language?.startsWith('en') ? 'en' : 'ru'}
+            onChange={(lng) => i18n.changeLanguage(lng)}
+            size="small" style={{ width: 72 }}
+            options={[{ value: 'ru', label: '🇷🇺 RU' }, { value: 'en', label: '🇬🇧 EN' }]}
+          />
 
           {user ? (
             <>
@@ -195,8 +204,8 @@ export default function MainLayout() {
             </>
           ) : (
             <>
-              <Link to="/login"><Button>Войти</Button></Link>
-              <Link to="/register"><Button type="primary">Регистрация</Button></Link>
+              <Link to="/login"><Button>{t('nav.login')}</Button></Link>
+              <Link to="/register"><Button type="primary">{t('nav.register')}</Button></Link>
             </>
           )}
         </Space>
@@ -208,7 +217,7 @@ export default function MainLayout() {
       </Content>
 
       <Footer style={{ textAlign: 'center', background: '#fffdf9', borderTop: '1px solid #efe3d2', color: '#a8957f' }}>
-        🪵 Маркетплейс изделий ручной работы · © {new Date().getFullYear()}
+        🪵 {t('footer')} · © {new Date().getFullYear()}
       </Footer>
     </Layout>
   )
