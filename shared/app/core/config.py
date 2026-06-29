@@ -121,6 +121,17 @@ class Settings(BaseSettings):
     MEILI_URL: str = ""
     MEILI_KEY: str = ""
 
+    # Caching (Redis). When enabled, hot read paths (categories, currency rates,
+    # homepage) are cached. Falls back transparently if Redis is unreachable.
+    CACHE_ENABLED: bool = True
+    CACHE_DEFAULT_TTL: int = 300
+
+    # Observability
+    SENTRY_DSN: str = ""                 # empty → Sentry disabled
+    SENTRY_TRACES_SAMPLE_RATE: float = 0.0
+    METRICS_ENABLED: bool = True         # expose Prometheus /metrics per service
+    APP_VERSION: str = "1.0.0"
+
     @field_validator("BACKEND_CORS_ORIGINS", mode="before")
     @classmethod
     def assemble_cors_origins(cls, v: Union[str, List[str]]) -> List[str]:

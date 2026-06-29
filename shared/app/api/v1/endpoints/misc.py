@@ -143,13 +143,20 @@ categories_router = APIRouter(prefix="/categories", tags=["categories"])
 
 @categories_router.get("", response_model=list[CategoryOut])
 async def list_categories(db: AsyncSession = Depends(get_db)):
+    from app.services.cache_service import cache_get, cache_set
+    cache_key = "categories:tree"
+    cached_val = await cache_get(cache_key)
+    if cached_val is not None:
+        return cached_val
     result = await db.execute(
         select(Category)
         .options(selectinload(Category.children))
         .where(Category.parent_id == None)  # noqa: E711
         .order_by(Category.sort_order)
     )
-    return result.scalars().all()
+    data = [CategoryOut.model_validate(c).model_dump(mode="json") for c in result.scalars().all()]
+    await cache_set(cache_key, data, ttl=600)
+    return data
 
 
 @categories_router.get("/{slug}", response_model=CategoryOut)

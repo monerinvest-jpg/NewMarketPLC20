@@ -1081,6 +1081,8 @@ async def create_category(
     db.add(cat)
     await db.commit()
     await db.refresh(cat)
+    from app.services.cache_service import invalidate_prefix
+    await invalidate_prefix("categories:")
     return _cat_out(cat)
 
 
@@ -1129,6 +1131,8 @@ async def update_category(
         setattr(cat, field, value)
     await db.commit()
     await db.refresh(cat)
+    from app.services.cache_service import invalidate_prefix
+    await invalidate_prefix("categories:")
     return _cat_out(cat)
 
 
@@ -1173,6 +1177,8 @@ async def delete_category(
 
     await db.delete(cat)
     await db.commit()
+    from app.services.cache_service import invalidate_prefix
+    await invalidate_prefix("categories:")
 
 
 # ─── Reports ──────────────────────────────────────────────────────────────────

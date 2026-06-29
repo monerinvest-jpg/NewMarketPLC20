@@ -40,7 +40,12 @@ async def save_file(content: bytes, content_type: str, original_name: str) -> st
     if len(content) > MAX_FILE_SIZE:
         raise ValueError("Файл слишком большой (максимум 5 МБ).")
 
-    filename = _safe_name(original_name)
+    # Optimise raster images to WebP off the event loop (best-effort; raw bytes
+    # come back unchanged for SVG/GIF or on any failure).
+    import asyncio
+    from app.services import image_service
+    content, content_type, ext = await asyncio.to_thread(image_service.optimize, content, content_type)
+    filename = f"{uuid.uuid4().hex}{ext}"
 
     if _s3_configured():
         return await _save_s3(content, content_type, filename)
