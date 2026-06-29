@@ -21,14 +21,36 @@ export default function AdminPlatformAnalytics() {
     <div>
       <Title level={3}>Аналитика платформы</Title>
 
-      <Row gutter={16} style={{ marginBottom: 24 }}>
+      <Row gutter={16} style={{ marginBottom: 16 }}>
         <Col xs={24} sm={12}>
-          <Card><Statistic title="GMV (оборот)" value={data.gmv} suffix="₽" valueStyle={{ color: '#f97316' }} /></Card>
+          <Card><Statistic title="GMV (оборот)" value={data.gmv} suffix="₽" valueStyle={{ color: '#b45309' }} /></Card>
         </Col>
         <Col xs={24} sm={12}>
-          <Card><Statistic title="Доход платформы (комиссии)" value={data.platform_revenue} suffix="₽" valueStyle={{ color: '#3f8600' }} /></Card>
+          <Card><Statistic title="Доход платформы (комиссии)" value={data.platform_revenue} suffix="₽" valueStyle={{ color: '#4d7c0f' }} /></Card>
         </Col>
       </Row>
+
+      {(data as any).finance && (() => {
+        const f = (data as any).finance
+        return (
+          <>
+            <Row gutter={16} style={{ marginBottom: 16 }}>
+              <Col xs={12} md={6}><Card size="small"><Statistic title="Чистая прибыль" value={f.net_profit} suffix="₽" valueStyle={{ color: f.net_profit >= 0 ? '#4d7c0f' : '#cf1322' }} /></Card></Col>
+              <Col xs={12} md={6}><Card size="small"><Statistic title="Расход на рефералов" value={f.referral_cost} suffix="₽" /></Card></Col>
+              <Col xs={12} md={6}><Card size="small"><Statistic title="Выплачено всего" value={f.payouts_paid} suffix="₽" /></Card></Col>
+              <Col xs={12} md={6}><Card size="small"><Statistic title="Выплаты в ожидании" value={f.payouts_pending} suffix="₽" valueStyle={{ color: '#d46b08' }} /></Card></Col>
+            </Row>
+            <Card size="small" title="Обязательства перед пользователями (мы держим на балансах)" style={{ marginBottom: 24 }}>
+              <Row gutter={16}>
+                <Col xs={12} md={6}><Statistic title="Балансы продавцов" value={f.liabilities.seller_balances} suffix="₽" /></Col>
+                <Col xs={12} md={6}><Statistic title="Реферальные балансы" value={f.liabilities.referral_balances} suffix="₽" /></Col>
+                <Col xs={12} md={6}><Statistic title="Бонусные балансы" value={f.liabilities.bonus_balances} suffix="₽" /></Col>
+                <Col xs={12} md={6}><Statistic title="Ожидающие выводы" value={f.liabilities.pending_payouts} suffix="₽" /></Col>
+              </Row>
+            </Card>
+          </>
+        )
+      })()}
 
       <Card title="Заказы и выручка за 30 дней" style={{ marginBottom: 24 }}>
         {data.trend.length === 0 ? <Empty /> : (

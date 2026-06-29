@@ -335,6 +335,7 @@ export const adminApi = {
     api.get<PaginatedResponse<User>>('/admin/users', { params }).then(r => r.data),
   updateUser: (id: number, data: { is_active?: boolean; role?: string; is_staff?: boolean }) =>
     api.patch<User>(`/admin/users/${id}`, data).then(r => r.data),
+  userDetail: (id: number) => api.get<any>(`/admin/users/${id}`).then(r => r.data),
 
   // Shops
   listShops: (params?: { page?: number; q?: string; is_active?: boolean; status?: string }) =>
@@ -345,6 +346,8 @@ export const adminApi = {
     api.post<Shop>(`/admin/shops/${id}/moderate`, { status, moderation_reason }).then(r => r.data),
   shopRequisites: (id: number) =>
     api.get<any>(`/admin/shops/${id}/requisites`).then(r => r.data),
+  shopDetail: (id: number) =>
+    api.get<any>(`/admin/shops/${id}/detail`).then(r => r.data),
   // Block D: SMS (SMSC.ru) section
   smsStatus: () => api.get<any>('/admin/sms/status').then(r => r.data),
   smsUpdateSettings: (data: Record<string, any>) =>

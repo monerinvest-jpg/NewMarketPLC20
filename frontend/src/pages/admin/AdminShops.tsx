@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { Table, InputNumber, Typography, message, Input, Space, Button, Tag, Select, Modal } from 'antd'
 import { adminApi } from '@/api'
 import type { Shop } from '@/types'
@@ -88,7 +89,7 @@ export default function AdminShops() {
         pagination={{ current: page, total, pageSize: 20, onChange: setPage }}
         columns={[
           { title: 'ID', dataIndex: 'id', width: 60 },
-          { title: 'Название', dataIndex: 'name' },
+          { title: 'Название', dataIndex: 'name', render: (v, shop) => <Link to={`/admin/shops/${shop.id}`}>{v}</Link> },
           {
             title: 'Статус', dataIndex: 'status', width: 130,
             render: (s) => <Tag color={statusLabels[s || 'active']?.color}>{statusLabels[s || 'active']?.label}</Tag>,

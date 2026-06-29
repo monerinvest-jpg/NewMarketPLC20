@@ -1,100 +1,174 @@
+import { useState } from 'react'
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
-import { Layout, Menu, Button, Avatar, Typography, Space } from 'antd'
+import { Layout, Menu, Button, Avatar, Typography, Space, Grid } from 'antd'
 import {
   DashboardOutlined, UserOutlined, ShopOutlined, AppstoreOutlined,
   ShoppingOutlined, TagsOutlined, WarningOutlined, SettingOutlined,
   GiftOutlined, TeamOutlined, LinkOutlined, LogoutOutlined, StarOutlined, CreditCardOutlined,
   WalletOutlined, PictureOutlined, AreaChartOutlined, DollarOutlined,
-  SafetyCertificateOutlined, FileSearchOutlined, MessageOutlined, FileDoneOutlined, RiseOutlined, GiftOutlined, CrownOutlined,
+  SafetyCertificateOutlined, FileSearchOutlined, MessageOutlined, FileDoneOutlined,
+  RiseOutlined, CrownOutlined, HomeOutlined, ShoppingCartOutlined, NotificationOutlined,
 } from '@ant-design/icons'
 import { useAuthStore } from '@/store/authStore'
 
-const { Sider, Content, Header } = Layout
+const { Sider, Content } = Layout
+const { useBreakpoint } = Grid
 
-const menuItems = [
-  { key: '/admin', icon: <DashboardOutlined />, label: <Link to="/admin">Дашборд</Link> },
-  { key: '/admin/users', icon: <UserOutlined />, label: <Link to="/admin/users">Пользователи</Link> },
-  { key: '/admin/shops', icon: <ShopOutlined />, label: <Link to="/admin/shops">Магазины</Link> },
-  { key: '/admin/products', icon: <AppstoreOutlined />, label: <Link to="/admin/products">Товары</Link> },
-  { key: '/admin/moderation-queue', icon: <SafetyCertificateOutlined />, label: <Link to="/admin/moderation-queue">Очередь модерации</Link> },
-  { key: '/admin/orders', icon: <ShoppingOutlined />, label: <Link to="/admin/orders">Заказы</Link> },
-  { key: '/admin/categories', icon: <TagsOutlined />, label: <Link to="/admin/categories">Категории</Link> },
-  { key: '/admin/reports', icon: <WarningOutlined />, label: <Link to="/admin/reports">Жалобы</Link> },
-  { key: '/admin/reviews', icon: <StarOutlined />, label: <Link to="/admin/reviews">Отзывы</Link> },
-  { key: '/admin/coupons', icon: <GiftOutlined />, label: <Link to="/admin/coupons">Купоны</Link> },
-  { key: '/admin/plans', icon: <CreditCardOutlined />, label: <Link to="/admin/plans">Тарифы</Link> },
-  { key: '/admin/payouts', icon: <WalletOutlined />, label: <Link to="/admin/payouts">Выводы средств</Link> },
-  { key: '/admin/banners', icon: <PictureOutlined />, label: <Link to="/admin/banners">Баннеры</Link> },
-  { key: '/admin/platform-analytics', icon: <AreaChartOutlined />, label: <Link to="/admin/platform-analytics">Аналитика платформы</Link> },
-  { key: '/admin/cohorts', icon: <AreaChartOutlined />, label: <Link to="/admin/cohorts">Когорты и LTV</Link> },
-  { key: '/admin/reconciliation', icon: <WalletOutlined />, label: <Link to="/admin/reconciliation">Реконсиляция</Link> },
-  { key: '/admin/fiscal-receipts', icon: <FileDoneOutlined />, label: <Link to="/admin/fiscal-receipts">Фискальные чеки</Link> },
-  { key: '/admin/paid-features', icon: <RiseOutlined />, label: <Link to="/admin/paid-features">Платные возможности</Link> },
-  { key: '/admin/gift-certificates', icon: <GiftOutlined />, label: <Link to="/admin/gift-certificates">Сертификаты</Link> },
-  { key: '/admin/loyalty-tiers', icon: <CrownOutlined />, label: <Link to="/admin/loyalty-tiers">Лояльность</Link> },
-  { key: '/admin/feature-flags', icon: <SettingOutlined />, label: <Link to="/admin/feature-flags">Feature flags</Link> },
-  { key: '/admin/sms', icon: <MessageOutlined />, label: <Link to="/admin/sms">SMS (SMSC.ru)</Link> },
-  { key: '/admin/currencies', icon: <DollarOutlined />, label: <Link to="/admin/currencies">Валюты</Link> },
-  { key: '/admin/referrals', icon: <LinkOutlined />, label: <Link to="/admin/referrals">Рефералы</Link> },
-  { key: '/admin/moderators', icon: <TeamOutlined />, label: <Link to="/admin/moderators">Модераторы</Link> },
-  { key: '/admin/audit-log', icon: <FileSearchOutlined />, label: <Link to="/admin/audit-log">Журнал действий</Link> },
-  { key: '/admin/settings', icon: <SettingOutlined />, label: <Link to="/admin/settings">Настройки</Link> },
+// Grouped navigation — 27 destinations organised into 6 collapsible sections so
+// the sider stays scannable instead of a single endless list.
+const groups = [
+  {
+    key: 'grp-overview', icon: <DashboardOutlined />, label: 'Обзор',
+    children: [
+      { key: '/admin', icon: <DashboardOutlined />, label: 'Дашборд' },
+      { key: '/admin/platform-analytics', icon: <AreaChartOutlined />, label: 'Аналитика платформы' },
+      { key: '/admin/cohorts', icon: <RiseOutlined />, label: 'Когорты и LTV' },
+      { key: '/admin/reconciliation', icon: <WalletOutlined />, label: 'Реконсиляция' },
+    ],
+  },
+  {
+    key: 'grp-users', icon: <TeamOutlined />, label: 'Люди и магазины',
+    children: [
+      { key: '/admin/users', icon: <UserOutlined />, label: 'Пользователи' },
+      { key: '/admin/shops', icon: <ShopOutlined />, label: 'Магазины' },
+      { key: '/admin/moderators', icon: <TeamOutlined />, label: 'Модераторы' },
+    ],
+  },
+  {
+    key: 'grp-catalog', icon: <AppstoreOutlined />, label: 'Каталог',
+    children: [
+      { key: '/admin/products', icon: <AppstoreOutlined />, label: 'Товары' },
+      { key: '/admin/moderation-queue', icon: <SafetyCertificateOutlined />, label: 'Очередь модерации' },
+      { key: '/admin/categories', icon: <TagsOutlined />, label: 'Категории' },
+      { key: '/admin/reviews', icon: <StarOutlined />, label: 'Отзывы' },
+    ],
+  },
+  {
+    key: 'grp-sales', icon: <ShoppingCartOutlined />, label: 'Продажи и финансы',
+    children: [
+      { key: '/admin/orders', icon: <ShoppingOutlined />, label: 'Заказы' },
+      { key: '/admin/payouts', icon: <WalletOutlined />, label: 'Выводы средств' },
+      { key: '/admin/fiscal-receipts', icon: <FileDoneOutlined />, label: 'Фискальные чеки' },
+    ],
+  },
+  {
+    key: 'grp-marketing', icon: <NotificationOutlined />, label: 'Маркетинг',
+    children: [
+      { key: '/admin/coupons', icon: <GiftOutlined />, label: 'Купоны' },
+      { key: '/admin/banners', icon: <PictureOutlined />, label: 'Баннеры' },
+      { key: '/admin/gift-certificates', icon: <GiftOutlined />, label: 'Сертификаты' },
+      { key: '/admin/loyalty-tiers', icon: <CrownOutlined />, label: 'Лояльность' },
+      { key: '/admin/referrals', icon: <LinkOutlined />, label: 'Рефералы' },
+    ],
+  },
+  {
+    key: 'grp-platform', icon: <SettingOutlined />, label: 'Платформа',
+    children: [
+      { key: '/admin/plans', icon: <CreditCardOutlined />, label: 'Тарифы' },
+      { key: '/admin/paid-features', icon: <RiseOutlined />, label: 'Платные возможности' },
+      { key: '/admin/currencies', icon: <DollarOutlined />, label: 'Валюты' },
+      { key: '/admin/reports', icon: <WarningOutlined />, label: 'Жалобы' },
+      { key: '/admin/feature-flags', icon: <SettingOutlined />, label: 'Feature flags' },
+      { key: '/admin/sms', icon: <MessageOutlined />, label: 'SMS (SMSC.ru)' },
+      { key: '/admin/audit-log', icon: <FileSearchOutlined />, label: 'Журнал действий' },
+      { key: '/admin/settings', icon: <SettingOutlined />, label: 'Настройки' },
+    ],
+  },
 ]
+
+const leafKeys = groups.flatMap((g) => g.children.map((c) => c.key))
+
+const menuItems = groups.map((g) => ({
+  key: g.key,
+  icon: g.icon,
+  label: g.label,
+  children: g.children.map((c) => ({
+    key: c.key,
+    icon: c.icon,
+    label: <Link to={c.key}>{c.label}</Link>,
+  })),
+}))
 
 export default function AdminLayout() {
   const location = useLocation()
   const navigate = useNavigate()
   const { user, logout } = useAuthStore()
+  const screens = useBreakpoint()
+  const [collapsed, setCollapsed] = useState(false)
 
-  const selectedKey = menuItems
-    .map((i) => i.key)
+  const selectedKey = leafKeys
     .filter((k) => location.pathname === k || (k !== '/admin' && location.pathname.startsWith(k)))
     .sort((a, b) => b.length - a.length)[0] || '/admin'
+  const openKey = groups.find((g) => g.children.some((c) => c.key === selectedKey))?.key
+
+  const width = 240
+  const collapsedWidth = 72
+  const marginLeft = collapsed ? collapsedWidth : width
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
       <Sider
-        width={220}
+        width={width}
+        collapsedWidth={collapsedWidth}
+        collapsible
+        collapsed={collapsed}
+        onCollapse={setCollapsed}
+        breakpoint="lg"
+        trigger={null}
         style={{
           position: 'fixed', left: 0, top: 0, bottom: 0,
-          background: '#fff', borderRight: '1px solid #f0f0f0',
-          overflow: 'auto', zIndex: 100,
+          background: '#fffdf9', borderRight: '1px solid #efe3d2',
+          display: 'flex', flexDirection: 'column', zIndex: 100,
         }}
       >
-        <div style={{ padding: '20px 16px', borderBottom: '1px solid #f0f0f0' }}>
-          <Link to="/" style={{ fontSize: 18, fontWeight: 700, color: '#f97316' }}>
-            🛍️ Marketplace
+        <div style={{ padding: collapsed ? '18px 0' : '18px 16px', borderBottom: '1px solid #efe3d2', textAlign: collapsed ? 'center' : 'left' }}>
+          <Link to="/" style={{ fontSize: collapsed ? 22 : 18, fontWeight: 700, color: '#b45309' }}>
+            {collapsed ? '🪵' : '🪵 Маркетплейс'}
           </Link>
-          <div style={{ fontSize: 12, color: '#999', marginTop: 4 }}>Админ-панель</div>
+          {!collapsed && <div style={{ fontSize: 12, color: '#a8957f', marginTop: 4 }}>Админ-панель</div>}
         </div>
 
-        <Menu
-          mode="inline"
-          selectedKeys={[selectedKey]}
-          items={menuItems}
-          style={{ border: 'none', marginTop: 8 }}
-        />
+        {/* Scrollable menu region — flex:1 so the footer never overlaps it */}
+        <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
+          <Menu
+            mode="inline"
+            selectedKeys={[selectedKey]}
+            defaultOpenKeys={openKey ? [openKey] : []}
+            items={menuItems}
+            style={{ border: 'none', background: 'transparent', marginTop: 8 }}
+          />
+        </div>
 
-        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: 16, borderTop: '1px solid #f0f0f0' }}>
-          <Space>
-            <Avatar style={{ background: '#f97316' }}>{user?.full_name[0]}</Avatar>
-            <div>
-              <div style={{ fontSize: 12, fontWeight: 500, lineHeight: 1.2 }}>{user?.full_name}</div>
-              <div style={{ fontSize: 11, color: '#999' }}>{user?.role}</div>
-            </div>
-          </Space>
+        <div style={{ padding: 12, borderTop: '1px solid #efe3d2' }}>
+          {!collapsed && (
+            <Space style={{ marginBottom: 8 }}>
+              <Avatar style={{ background: '#b45309' }}>{user?.full_name?.[0]}</Avatar>
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 500, lineHeight: 1.2 }}>{user?.full_name}</div>
+                <div style={{ fontSize: 11, color: '#a8957f' }}>{user?.role}</div>
+              </div>
+            </Space>
+          )}
           <Button
             type="text" danger size="small" icon={<LogoutOutlined />}
-            style={{ marginTop: 8, width: '100%' }}
+            style={{ width: '100%' }}
             onClick={() => { logout(); navigate('/') }}
           >
-            Выйти
+            {!collapsed && 'Выйти'}
           </Button>
         </div>
       </Sider>
 
-      <Layout style={{ marginLeft: 220 }}>
-        <Content style={{ padding: 24, minHeight: '100vh', background: '#f5f5f5' }}>
+      <Layout style={{ marginLeft, transition: 'margin-left 0.2s', background: 'transparent' }}>
+        <div style={{ padding: '12px 16px 0', display: 'flex', alignItems: 'center', gap: 12 }}>
+          <Button type="text" icon={<HomeOutlined />} onClick={() => setCollapsed((c) => !c)}>
+            {screens.lg ? 'Свернуть меню' : 'Меню'}
+          </Button>
+          <Typography.Text type="secondary" style={{ fontSize: 13 }}>
+            {(leafKeys.includes(selectedKey) && groups.find((g) => g.key === openKey)?.label) || 'Админ'}
+          </Typography.Text>
+        </div>
+        <Content style={{ padding: screens.xs ? 14 : 24, minHeight: '100vh' }}>
           <Outlet />
         </Content>
       </Layout>

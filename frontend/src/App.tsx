@@ -46,7 +46,9 @@ const ComparePage = lazy(() => import('./pages/catalog/ComparePage'))
 // Admin pages
 const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'))
 const AdminUsers = lazy(() => import('./pages/admin/AdminUsers'))
+const AdminUserDetail = lazy(() => import('./pages/admin/AdminUserDetail'))
 const AdminShops = lazy(() => import('./pages/admin/AdminShops'))
+const AdminShopDetail = lazy(() => import('./pages/admin/AdminShopDetail'))
 const AdminProducts = lazy(() => import('./pages/admin/AdminProducts'))
 const AdminOrders = lazy(() => import('./pages/admin/AdminOrders'))
 const AdminCategories = lazy(() => import('./pages/admin/AdminCategories'))
@@ -93,11 +95,28 @@ const SellerFlashSales = lazy(() => import('./pages/seller/SellerFlashSales'))
 const SellerChatTemplates = lazy(() => import('./pages/seller/SellerChatTemplates'))
 const SellerRequisitesPage = lazy(() => import('./pages/seller/SellerRequisitesPage'))
 
+// Craft / wood theme: warm amber-terracotta accents on parchment, walnut text,
+// softer radii. Evokes handmade goods rather than a cold marketplace.
 const antdTheme = {
   token: {
-    colorPrimary: '#f97316',
-    borderRadius: 8,
-    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+    colorPrimary: '#b45309',          // warm amber / terracotta
+    colorLink: '#b45309',
+    colorInfo: '#b45309',
+    colorSuccess: '#4d7c0f',          // moss green
+    borderRadius: 10,
+    colorBgLayout: '#f7f1e8',         // warm parchment
+    colorTextHeading: '#5b3a1e',      // walnut
+    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+  },
+  components: {
+    Layout: { headerBg: '#fffdf9', bodyBg: '#f7f1e8', footerBg: '#fffdf9' },
+    Menu: {
+      itemSelectedBg: '#f3e3cf', itemSelectedColor: '#7c4a21',
+      itemHoverBg: '#f7eede', itemHoverColor: '#7c4a21',
+      subMenuItemBg: 'transparent',
+    },
+    Card: { borderRadiusLG: 14 },
+    Button: { borderRadius: 10, fontWeight: 500 },
   },
 }
 
@@ -196,7 +215,9 @@ function App() {
             >
               <Route index element={<AdminDashboard />} />
               <Route path="users" element={<AdminUsers />} />
+              <Route path="users/:id" element={<AdminUserDetail />} />
               <Route path="shops" element={<AdminShops />} />
+              <Route path="shops/:id" element={<AdminShopDetail />} />
               <Route path="products" element={<AdminProducts />} />
               <Route path="orders" element={<AdminOrders />} />
               <Route path="categories" element={<AdminCategories />} />

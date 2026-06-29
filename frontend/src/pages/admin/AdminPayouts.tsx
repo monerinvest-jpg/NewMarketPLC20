@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { Table, Button, Tag, Select, Modal, Input, message, Typography, Space } from 'antd'
 import { adminApi } from '@/api'
 import type { PayoutRequest } from '@/types'
@@ -58,7 +59,18 @@ export default function AdminPayouts() {
         columns={[
           { title: '№', dataIndex: 'id', width: 60 },
           { title: 'Дата', dataIndex: 'created_at', render: (v) => dayjs(v).format('DD.MM.YYYY HH:mm') },
-          { title: 'Пользователь ID', dataIndex: 'user_id' },
+          {
+            title: 'Пользователь',
+            render: (_, p: any) => (
+              <Space direction="vertical" size={0}>
+                <Link to={`/admin/users/${p.user_id}`}>{p.user_name || `#${p.user_id}`}</Link>
+                <span style={{ fontSize: 12, color: '#888' }}>
+                  {p.user_email}{' '}
+                  {p.user_email_verified === false && <Tag color="red" style={{ marginLeft: 4 }}>email не подтверждён</Tag>}
+                </span>
+              </Space>
+            ),
+          },
           {
             title: 'Источник', dataIndex: 'source', width: 110,
             render: (v) => v === 'referral'

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Table, Input, Select, Switch, Tag, Typography, message, Space } from 'antd'
+import { Link } from 'react-router-dom'
+import { Table, Input, Select, Switch, Tag, Typography, message, Space, Button } from 'antd'
 import { adminApi } from '@/api'
 import type { User } from '@/types'
 
@@ -76,6 +77,10 @@ export default function AdminUsers() {
             render: (active, user) => (
               <Switch checked={active} onChange={() => handleToggleActive(user)} />
             ),
+          },
+          {
+            title: '', width: 110,
+            render: (_, user) => <Link to={`/admin/users/${user.id}`}><Button size="small">Профиль</Button></Link>,
           },
         ]}
       />
