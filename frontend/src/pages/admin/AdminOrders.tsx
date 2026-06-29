@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Table, Tag, Select, Button, Modal, message, Typography, Descriptions, Popconfirm } from 'antd'
+import { Table, Tag, Select, Button, Modal, message, Typography, Descriptions, Popconfirm, Input, Space } from 'antd'
 import { adminApi } from '@/api'
 import type { Order } from '@/types'
 import dayjs from 'dayjs'
@@ -24,6 +24,26 @@ export default function AdminOrders() {
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState<string | undefined>()
   const [detailOrder, setDetailOrder] = useState<Order | null>(null)
+  const [editAddr, setEditAddr] = useState('')
+  const [editTrack, setEditTrack] = useState('')
+
+  const openDetail = (order: Order) => {
+    setDetailOrder(order)
+    setEditAddr(order.delivery_address || '')
+    setEditTrack(order.delivery_info?.tracking_number || '')
+  }
+
+  const saveOrderEdits = async () => {
+    if (!detailOrder) return
+    try {
+      await adminApi.updateOrderStatus(detailOrder.id, detailOrder.status, editTrack || undefined, editAddr || undefined)
+      message.success('Заказ обновлён')
+      setDetailOrder(null)
+      load()
+    } catch (e: any) {
+      message.error(e.response?.data?.detail || 'Ошибка')
+    }
+  }
 
   const load = () => {
     setLoading(true)
@@ -77,7 +97,7 @@ export default function AdminOrders() {
             title: 'Действия',
             render: (_, order) => (
               <>
-                <Button size="small" onClick={() => setDetailOrder(order)}>Детали</Button>
+                <Button size="small" onClick={() => openDetail(order)}>Детали</Button>
                 {(order.status === 'paid' || order.status === 'processing') && (
                   <Popconfirm title="Инициировать возврат?" onConfirm={() => handleRefund(order.id)}>
                     <Button size="small" danger style={{ marginLeft: 8 }}>Возврат</Button>
@@ -106,15 +126,20 @@ export default function AdminOrders() {
                   options={Object.entries(statusLabels).map(([k, v]) => ({ value: k, label: v.label }))}
                 />
               </Descriptions.Item>
-              <Descriptions.Item label="Адрес">{detailOrder.delivery_address}</Descriptions.Item>
+              <Descriptions.Item label="Адрес">
+                <Input.TextArea value={editAddr} onChange={(e) => setEditAddr(e.target.value)} autoSize={{ minRows: 1, maxRows: 3 }} />
+              </Descriptions.Item>
+              <Descriptions.Item label="Трек-номер">
+                <Space.Compact style={{ width: '100%' }}>
+                  <Input value={editTrack} onChange={(e) => setEditTrack(e.target.value)} placeholder="нет" />
+                  <Button type="primary" onClick={saveOrderEdits}>Сохранить</Button>
+                </Space.Compact>
+              </Descriptions.Item>
               <Descriptions.Item label="Сумма товаров">{parseFloat(detailOrder.subtotal).toLocaleString('ru')} ₽</Descriptions.Item>
               <Descriptions.Item label="Доставка">{parseFloat(detailOrder.delivery_cost).toLocaleString('ru')} ₽</Descriptions.Item>
               <Descriptions.Item label="Комиссия платформы (всего)">{parseFloat(detailOrder.platform_fee).toLocaleString('ru')} ₽ (~{detailOrder.commission_percent_used}%)</Descriptions.Item>
               <Descriptions.Item label="Выплата продавцам (всего)">{parseFloat(detailOrder.seller_net).toLocaleString('ru')} ₽</Descriptions.Item>
               <Descriptions.Item label="Итого">{parseFloat(detailOrder.total_price).toLocaleString('ru')} ₽</Descriptions.Item>
-              {detailOrder.delivery_info?.tracking_number && (
-                <Descriptions.Item label="Трек-номер">{detailOrder.delivery_info.tracking_number}</Descriptions.Item>
-              )}
             </Descriptions>
 
             <Typography.Title level={5} style={{ marginTop: 16 }}>

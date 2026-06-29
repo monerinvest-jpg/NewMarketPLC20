@@ -144,6 +144,13 @@ class ShopUpdate(BaseModel):
 class ShopAdminUpdate(BaseModel):
     is_active: Optional[bool] = None
     commission_percent: Optional[Decimal] = Field(None, ge=0, le=100)
+    # Full admin editing of shop fields.
+    name: Optional[str] = Field(None, min_length=2)
+    description: Optional[str] = None
+    tagline: Optional[str] = None
+    contact_email: Optional[str] = None
+    contact_phone: Optional[str] = None
+    accent_color: Optional[str] = None
 
 
 class ShopOut(OrmBase):
@@ -510,6 +517,7 @@ class OrderCreate(BaseModel):
 class OrderStatusUpdate(BaseModel):
     status: OrderStatus
     tracking_number: Optional[str] = None
+    delivery_address: Optional[str] = None
 
 
 class OrderOut(OrmBase):

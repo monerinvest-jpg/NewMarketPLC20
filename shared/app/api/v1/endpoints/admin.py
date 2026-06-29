@@ -376,14 +376,17 @@ async def update_shop(
     shop_id: int,
     payload: ShopAdminUpdate,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(get_current_moderator_or_admin),
+    current_user: User = Depends(get_current_moderator_or_admin),
 ):
     result = await db.execute(select(Shop).where(Shop.id == shop_id))
     shop = result.scalar_one_or_none()
     if not shop:
         raise HTTPException(status_code=404, detail="Shop not found")
-    for field, value in payload.model_dump(exclude_unset=True).items():
+    data = payload.model_dump(exclude_unset=True)
+    for field, value in data.items():
         setattr(shop, field, value)
+    from app.services.audit_service import log_action
+    await log_action(db, current_user.id, "shop.update", "shop", shop.id, detail=", ".join(data.keys()))
     await db.commit()
     await db.refresh(shop)
     return shop
@@ -819,7 +822,7 @@ async def update_order_admin(
     order_id: int,
     payload: OrderStatusUpdate,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(get_current_moderator_or_admin),
+    current_user: User = Depends(get_current_moderator_or_admin),
 ):
     from app.services.payout_service import payout_sellers_for_order, refund_sellers_for_order
     from app.services.referral_service import process_buyer_referral_reward, process_seller_referral_reward
@@ -834,30 +837,34 @@ async def update_order_admin(
         raise HTTPException(status_code=404, detail="Order not found")
 
     previous_status = order.status
+    terminal = (OrderStatus.cancelled, OrderStatus.refunded)
     order.status = payload.status
-    if payload.tracking_number and order.delivery_info:
+    if payload.tracking_number is not None and order.delivery_info:
         order.delivery_info.tracking_number = payload.tracking_number
+    if payload.delivery_address is not None:
+        order.delivery_address = payload.delivery_address
 
     # Same payout/refund/referral side-effects as the buyer-facing endpoint,
     # so an admin manually moving an order to 'completed' or 'cancelled'
     # triggers the correct per-seller financial outcome.
-    if payload.status == OrderStatus.completed:
+    if payload.status == OrderStatus.completed and previous_status != OrderStatus.completed:
         await payout_sellers_for_order(order, db)
         await process_buyer_referral_reward(order, db)
         await process_seller_referral_reward(order, db)
         from app.services.loyalty_service import award_cashback_for_order
         await award_cashback_for_order(order, db)
 
-    if payload.status == OrderStatus.cancelled and previous_status == OrderStatus.paid:
-        await refund_sellers_for_order(order, db)
-        for item in order.items:
-            item.product.quantity += item.quantity
-        if order.bonus_used > 0:
-            buyer_res = await db.execute(select(User).where(User.id == order.buyer_id))
-            buyer = buyer_res.scalar_one_or_none()
-            if buyer:
-                buyer.bonus_balance += order.bonus_used
+    # Comprehensive reversal (stock + bonus + promo + referral balances + seller
+    # refund + revoked digital entitlements) when cancelling/refunding a live order.
+    if payload.status in terminal and previous_status not in terminal:
+        from app.services.order_reversal_service import restore_order
+        await restore_order(db, order)
 
+    from app.services.audit_service import log_action
+    await log_action(
+        db, current_user.id, "order.update", "order", order.id,
+        detail=f"{previous_status} → {payload.status}",
+    )
     await db.commit()
     await db.refresh(order)
     return order

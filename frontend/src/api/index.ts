@@ -340,8 +340,11 @@ export const adminApi = {
   // Shops
   listShops: (params?: { page?: number; q?: string; is_active?: boolean; status?: string }) =>
     api.get<PaginatedResponse<Shop>>('/admin/shops', { params }).then(r => r.data),
-  updateShop: (id: number, data: { is_active?: boolean; commission_percent?: number | null }) =>
-    api.patch<Shop>(`/admin/shops/${id}`, data).then(r => r.data),
+  updateShop: (id: number, data: {
+    is_active?: boolean; commission_percent?: number | null;
+    name?: string; description?: string; tagline?: string;
+    contact_email?: string; contact_phone?: string; accent_color?: string;
+  }) => api.patch<Shop>(`/admin/shops/${id}`, data).then(r => r.data),
   moderateShop: (id: number, status: string, moderation_reason?: string) =>
     api.post<Shop>(`/admin/shops/${id}/moderate`, { status, moderation_reason }).then(r => r.data),
   shopRequisites: (id: number) =>
@@ -390,8 +393,8 @@ export const adminApi = {
   // Orders
   listOrders: (params?: { page?: number; status?: string }) =>
     api.get<PaginatedResponse<Order>>('/admin/orders', { params }).then(r => r.data),
-  updateOrderStatus: (id: number, status: string, tracking_number?: string) =>
-    api.patch<Order>(`/admin/orders/${id}/status`, { status, tracking_number }).then(r => r.data),
+  updateOrderStatus: (id: number, status: string, tracking_number?: string, delivery_address?: string) =>
+    api.patch<Order>(`/admin/orders/${id}/status`, { status, tracking_number, delivery_address }).then(r => r.data),
   refundOrder: (id: number) =>
     api.post(`/admin/orders/${id}/refund`).then(r => r.data),
 
