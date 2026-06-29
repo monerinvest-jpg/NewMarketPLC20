@@ -26,7 +26,7 @@ from app.schemas.schemas import (
     ReportOut, ReportUpdate, SettingOut, SettingUpdate,
     ShopAdminUpdate, ShopOut, UserAdminUpdate, UserOut, CategoryCreate, CategoryOut, CategoryUpdate,
     ReviewOut, ReviewModerationUpdate,
-    FeatureFlagOut, FeatureFlagUpsert, UserPermissionsUpdate,
+    FeatureFlagOut, FeatureFlagUpsert, UserPermissionsUpdate, AdminBalanceAdjust,
 )
 from app.services import fiscal_service
 from app.services.settings_service import get_all_settings, set_setting
@@ -129,12 +129,73 @@ async def update_user(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    # Only superadmin can change roles
-    if payload.role is not None and current_user.role != UserRole.superadmin:
-        raise HTTPException(status_code=403, detail="Only superadmin can change roles")
+    is_superadmin = current_user.role == UserRole.superadmin or current_user.is_superuser
+    data = payload.model_dump(exclude_unset=True)
 
-    for field, value in payload.model_dump(exclude_unset=True).items():
+    # Role and superuser elevation are superadmin-only.
+    if ("role" in data or "is_superuser" in data) and not is_superadmin:
+        raise HTTPException(status_code=403, detail="Менять роль и права суперпользователя может только суперадмин")
+
+    # Email change must stay unique.
+    new_email = data.pop("email", None)
+    if new_email and new_email != user.email:
+        exists = (await db.execute(select(User.id).where(User.email == new_email, User.id != user_id))).scalar_one_or_none()
+        if exists:
+            raise HTTPException(status_code=400, detail="Этот email уже используется")
+        user.email = new_email
+
+    new_password = data.pop("new_password", None)
+    if new_password:
+        from app.core.security import get_password_hash
+        user.password_hash = get_password_hash(new_password)
+
+    for field, value in data.items():
         setattr(user, field, value)
+
+    from app.services.audit_service import log_action
+    changed = ", ".join(sorted(set(list(data.keys()) + (["email"] if new_email else []) + (["password"] if new_password else []))))
+    await log_action(db, current_user.id, "user.update", "user", user_id, detail=changed)
+    await db.commit()
+    await db.refresh(user)
+    return user
+
+
+@router.post("/users/{user_id}/adjust-balance", response_model=UserOut)
+async def adjust_user_balance(
+    user_id: int,
+    payload: AdminBalanceAdjust,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_superadmin),
+):
+    """Manually credit/debit any of a user's balances, with an audit trail and a
+    ledger entry. Superadmin only — this is a sensitive, money-moving action."""
+    from app.models.models import BalanceTransaction, BalanceTransactionType
+    from app.services.audit_service import log_action
+
+    allowed = {"balance", "bonus_balance", "referral_balance", "promo_balance"}
+    if payload.field not in allowed:
+        raise HTTPException(status_code=400, detail=f"Недопустимый баланс. Разрешено: {', '.join(sorted(allowed))}")
+    user = (await db.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+
+    current = getattr(user, payload.field) or Decimal("0")
+    new_value = (current + payload.amount).quantize(Decimal("0.01"))
+    if new_value < 0:
+        raise HTTPException(status_code=400, detail="Итоговый баланс не может быть отрицательным")
+    setattr(user, payload.field, new_value)
+
+    db.add(BalanceTransaction(
+        user_id=user.id, change=payload.amount,
+        type=BalanceTransactionType.credit if payload.amount >= 0 else BalanceTransactionType.debit,
+        reference_type="admin_adjust", reference_id=current_user.id,
+        description=f"[{payload.field}] {payload.reason}",
+        balance_after=new_value,
+    ))
+    await log_action(
+        db, current_user.id, "user.balance_adjust", "user", user_id,
+        detail=f"{payload.field} {payload.amount:+} → {new_value}; {payload.reason}",
+    )
     await db.commit()
     await db.refresh(user)
     return user
@@ -1915,9 +1976,30 @@ async def delete_feature_flag(
 
 @router.get("/permissions/catalog")
 async def permissions_catalog(_: User = Depends(get_current_superadmin)):
-    """The full catalog of grantable permissions (key -> description)."""
-    from app.services.rbac_service import ALL_PERMISSIONS
-    return [{"key": k, "description": v} for k, v in ALL_PERMISSIONS.items()]
+    """The grantable permissions, grouped to mirror the admin sidebar, each with
+    the menu items it unlocks (so the editor can show what a grant 'lights up')."""
+    from app.services.rbac_service import ALL_PERMISSIONS, PERMISSION_GROUPS, menu_for_permission
+    groups = []
+    for g in PERMISSION_GROUPS:
+        groups.append({
+            "group": g["group"],
+            "permissions": [
+                {"key": k, "description": ALL_PERMISSIONS[k], "menu": menu_for_permission(k)}
+                for k in g["keys"] if k in ALL_PERMISSIONS
+            ],
+        })
+    return {"groups": groups}
+
+
+@router.get("/my-menu")
+async def my_menu(current_user: User = Depends(get_current_moderator_or_admin)):
+    """Admin sidebar paths the CURRENT staff user may see (drives menu filtering)."""
+    from app.services.rbac_service import allowed_menu_paths, get_permissions
+    return {
+        "paths": allowed_menu_paths(current_user),
+        "permissions": get_permissions(current_user),
+        "is_superadmin": current_user.role.value == "superadmin" or current_user.is_superuser,
+    }
 
 
 @router.get("/users/{user_id}/permissions")

@@ -379,10 +379,13 @@ export const adminApi = {
   upsertFeatureFlag: (data: { key: string; description?: string; is_enabled: boolean; rollout_percent: number }) =>
     api.put('/admin/feature-flags', data).then(r => r.data),
   deleteFeatureFlag: (id: number) => api.delete(`/admin/feature-flags/${id}`),
-  permissionsCatalog: () => api.get<{ key: string; description: string }[]>('/admin/permissions/catalog').then(r => r.data),
+  permissionsCatalog: () => api.get<any>('/admin/permissions/catalog').then(r => r.data),
   getUserPermissions: (userId: number) => api.get<any>(`/admin/users/${userId}/permissions`).then(r => r.data),
   setUserPermissions: (userId: number, permissions: string[]) =>
     api.put(`/admin/users/${userId}/permissions`, { permissions }).then(r => r.data),
+  myMenu: () => api.get<{ paths: string[]; permissions: string[]; is_superadmin: boolean }>('/admin/my-menu').then(r => r.data),
+  adjustBalance: (userId: number, field: string, amount: number, reason: string) =>
+    api.post<User>(`/admin/users/${userId}/adjust-balance`, { field, amount, reason }).then(r => r.data),
 
   // Orders
   listOrders: (params?: { page?: number; status?: string }) =>

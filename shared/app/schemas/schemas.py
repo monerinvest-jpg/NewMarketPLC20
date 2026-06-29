@@ -72,9 +72,22 @@ class UserUpdate(BaseModel):
 
 
 class UserAdminUpdate(BaseModel):
+    full_name: Optional[str] = None
+    email: Optional[EmailStr] = None
+    phone: Optional[str] = None
     is_active: Optional[bool] = None
     role: Optional[UserRole] = None
     is_staff: Optional[bool] = None
+    is_superuser: Optional[bool] = None       # superadmin only
+    email_verified: Optional[bool] = None
+    phone_verified: Optional[bool] = None
+    new_password: Optional[str] = Field(None, min_length=6)
+
+
+class AdminBalanceAdjust(BaseModel):
+    field: str            # balance | bonus_balance | referral_balance | promo_balance
+    amount: Decimal       # signed delta (may be negative)
+    reason: str
 
 
 class UserOut(OrmBase):

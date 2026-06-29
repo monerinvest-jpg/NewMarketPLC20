@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
 import { Layout, Menu, Button, Avatar, Typography, Space, Grid } from 'antd'
+import { adminApi } from '@/api'
 import {
   DashboardOutlined, UserOutlined, ShopOutlined, AppstoreOutlined,
   ShoppingOutlined, TagsOutlined, WarningOutlined, SettingOutlined,
@@ -95,6 +96,20 @@ export default function AdminLayout() {
   const { user, logout } = useAuthStore()
   const screens = useBreakpoint()
   const [collapsed, setCollapsed] = useState(false)
+  // Allowed sidebar paths from the backend (driven by the user's permissions).
+  // null = not loaded yet → show everything to avoid a flash of an empty menu.
+  const [allowed, setAllowed] = useState<string[] | null>(null)
+
+  useEffect(() => {
+    adminApi.myMenu().then((r) => setAllowed(r.paths)).catch(() => setAllowed(null))
+  }, [])
+
+  // Filter groups/children to the permitted paths; drop emptied groups.
+  const visibleMenuItems = allowed === null
+    ? menuItems
+    : menuItems
+        .map((g) => ({ ...g, children: g.children.filter((c: any) => allowed.includes(c.key)) }))
+        .filter((g) => g.children.length > 0)
 
   const selectedKey = leafKeys
     .filter((k) => location.pathname === k || (k !== '/admin' && location.pathname.startsWith(k)))
@@ -134,7 +149,7 @@ export default function AdminLayout() {
             mode="inline"
             selectedKeys={[selectedKey]}
             defaultOpenKeys={openKey ? [openKey] : []}
-            items={menuItems}
+            items={visibleMenuItems}
             style={{ border: 'none', background: 'transparent', marginTop: 8 }}
           />
         </div>
