@@ -561,6 +561,18 @@ DELIVERY_SERVICES = {
 }
 
 
+async def enabled_delivery_services(db) -> dict:
+    """The subset of DELIVERY_SERVICES the admin has enabled (setting
+    `delivery_enabled_services` = comma-separated codes). Order is preserved;
+    falls back to all services when the setting is empty/unset."""
+    from app.services.settings_service import get_setting
+    raw = (await get_setting(db, "delivery_enabled_services")) or ""
+    codes = [c.strip() for c in raw.split(",") if c.strip()]
+    if not codes:
+        return dict(DELIVERY_SERVICES)
+    return {c: DELIVERY_SERVICES[c] for c in codes if c in DELIVERY_SERVICES}
+
+
 def get_delivery_gateway(service: str = "cdek") -> BaseDeliveryGateway:
     """
     Factory: returns the gateway for the requested service code.

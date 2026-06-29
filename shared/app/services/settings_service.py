@@ -50,6 +50,9 @@ DEFAULTS: Dict[str, str] = {
     "vip_auto_rating_min": "4.8",
     "vip_auto_reviews_min": "50",
     "kyc_required_for_payout": "false",
+    # Multi-delivery: comma-separated service codes enabled at checkout
+    # (cdek, ozon, yandex, russian_post). Empty = all enabled.
+    "delivery_enabled_services": "cdek,ozon,yandex,russian_post",
 }
 
 DESCRIPTIONS: Dict[str, str] = {

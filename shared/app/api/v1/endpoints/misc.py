@@ -94,9 +94,11 @@ delivery_router = APIRouter(prefix="/delivery", tags=["delivery"])
 
 
 @delivery_router.get("/services", response_model=list[DeliveryServiceOut])
-async def list_delivery_services():
-    """Returns all delivery services available on the platform."""
-    return [DeliveryServiceOut(code=code, name=name) for code, name in DELIVERY_SERVICES.items()]
+async def list_delivery_services(db: AsyncSession = Depends(get_db)):
+    """Returns the delivery services enabled by the admin."""
+    from app.services.delivery_service import enabled_delivery_services
+    services = await enabled_delivery_services(db)
+    return [DeliveryServiceOut(code=code, name=name) for code, name in services.items()]
 
 
 @delivery_router.post("/calculate", response_model=DeliveryCalculateResponse)
@@ -111,21 +113,21 @@ async def calculate_delivery(payload: DeliveryCalculateRequest):
 
 
 @delivery_router.post("/quote-all", response_model=list[DeliveryQuoteOut])
-async def quote_all_delivery(payload: DeliveryCalculateRequest):
+async def quote_all_delivery(payload: DeliveryCalculateRequest, db: AsyncSession = Depends(get_db)):
     """
-    Returns a price/time quote from every delivery service at once, so the
-    buyer can compare СДЭК / Ozon / Яндекс / Почта России side by side.
+    Returns a price/time quote from every ENABLED delivery service at once, so
+    the buyer can compare СДЭК / Ozon / Яндекс / Почта России side by side.
     """
     import asyncio
+    from app.services.delivery_service import enabled_delivery_services
 
     async def quote(code: str, name: str) -> DeliveryQuoteOut:
         gw = get_delivery_gateway(code)
         rate = await gw.calculate_rate(payload.city_from, payload.city_to, payload.weight_g)
         return DeliveryQuoteOut(code=code, name=name, cost=rate.cost, estimated_days=rate.estimated_days)
 
-    quotes = await asyncio.gather(*[
-        quote(code, name) for code, name in DELIVERY_SERVICES.items()
-    ])
+    services = await enabled_delivery_services(db)
+    quotes = await asyncio.gather(*[quote(code, name) for code, name in services.items()])
     return sorted(quotes, key=lambda q: q.cost)
 
 
