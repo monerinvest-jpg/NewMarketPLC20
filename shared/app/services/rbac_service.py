@@ -39,6 +39,7 @@ MENU_ITEMS = [
     ("/admin/metrics", "Метрики (Grafana)", "analytics.view"),
     ("/admin/users", "Пользователи", "users.view"),
     ("/admin/shops", "Магазины", "users.view"),
+    ("/admin/verifications", "Верификация продавцов", "moderate.shops"),
     ("/admin/moderators", "Модераторы", "users.manage"),
     ("/admin/products", "Товары", "moderate.products"),
     ("/admin/moderation-queue", "Очередь модерации", "moderate.products"),

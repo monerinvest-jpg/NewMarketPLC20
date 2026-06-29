@@ -363,6 +363,11 @@ class Shop(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     status: Mapped[ShopStatus] = mapped_column(Enum(ShopStatus), default=ShopStatus.pending, nullable=False)
     moderation_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # Trust signals. kyc_verified is set when document verification is approved;
+    # vip_until is the paid-VIP expiry. The effective badge (verified/vip) also
+    # factors in reputation thresholds — computed in trust_service.
+    kyc_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default="false")
+    vip_until: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     business_hours: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     rating: Mapped[Decimal] = mapped_column(Numeric(3, 2), default=Decimal("0.00"), nullable=False)
     reviews_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
@@ -405,6 +410,30 @@ class ShopMember(Base):
     __table_args__ = (
         UniqueConstraint("shop_id", "user_id", name="uq_shop_member_shop_user"),
     )
+
+
+class SellerVerificationStatus(str, enum.Enum):
+    none = "none"
+    pending = "pending"
+    verified = "verified"
+    rejected = "rejected"
+
+
+class SellerVerification(Base):
+    """KYC document verification for a shop. Approval sets Shop.kyc_verified and
+    grants the «Проверенный» badge. Documents are stored as private S3 keys."""
+    __tablename__ = "seller_verification"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    shop_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("shop.id"), unique=True, nullable=False)
+    status: Mapped[SellerVerificationStatus] = mapped_column(
+        Enum(SellerVerificationStatus), default=SellerVerificationStatus.pending, nullable=False)
+    document_keys: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # JSON list of private storage keys
+    note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)            # applicant note
+    reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)          # reviewer reason on reject
+    reviewed_by_id: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("user.id"), nullable=True)
+    submitted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+    reviewed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class Category(Base):

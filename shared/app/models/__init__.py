@@ -24,7 +24,7 @@ from app.models.models import (
     ProductType, CategoryKind, DigitalAsset, Entitlement,
     LessonType, Course, CourseModule, CourseLesson, LessonProgress,
     QuizAttempt, Certificate, PayoutSource, WithdrawalAccount,
-    ShopMember, ShopMemberRole,
+    ShopMember, ShopMemberRole, SellerVerification, SellerVerificationStatus,
 )
 
 __all__ = [
@@ -53,5 +53,5 @@ __all__ = [
     "ProductType", "CategoryKind", "DigitalAsset", "Entitlement",
     "LessonType", "Course", "CourseModule", "CourseLesson", "LessonProgress",
     "QuizAttempt", "Certificate", "PayoutSource", "WithdrawalAccount",
-    "ShopMember", "ShopMemberRole",
+    "ShopMember", "ShopMemberRole", "SellerVerification", "SellerVerificationStatus",
 ]

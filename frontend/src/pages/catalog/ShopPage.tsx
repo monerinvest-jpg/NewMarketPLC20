@@ -18,6 +18,7 @@ export default function ShopPage() {
   const [follow, setFollow] = useState<{ following: boolean; followers: number }>({ following: false, followers: 0 })
   const [loading, setLoading] = useState(true)
   const [reportModalOpen, setReportModalOpen] = useState(false)
+  const [badge, setBadge] = useState<string | null>(null)
 
   useEffect(() => {
     const shopId = parseInt(id!)
@@ -32,6 +33,7 @@ export default function ShopPage() {
     }).catch(() => message.error('Магазин не найден'))
       .finally(() => setLoading(false))
     reviewsApi.shopSummary(shopId).then(setSummary).catch(() => {})
+    shopsApi.badge(shopId).then((r) => setBadge(r.badge)).catch(() => {})
     if (user) shopsApi.followStatus(shopId).then(setFollow).catch(() => {})
   }, [id])
 
@@ -68,7 +70,11 @@ export default function ShopPage() {
               </div>
             )}
             <div>
-              <Title level={3} style={{ margin: 0 }}>{shop.name}</Title>
+              <Title level={3} style={{ margin: 0 }}>
+                {shop.name}{' '}
+                {badge === 'vip' && <Tag color="gold">★ VIP</Tag>}
+                {badge === 'verified' && <Tag color="green">✓ Проверенный</Tag>}
+              </Title>
               {shop.tagline && <Text type="secondary">{shop.tagline}</Text>}
               {(summary && summary.reviews_count > 0) ? (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>

@@ -42,6 +42,14 @@ DEFAULTS: Dict[str, str] = {
     # Observability: a Grafana dashboard URL embedded in admin → Метрики (iframe).
     # Use a shared/anonymous or kiosk-mode URL; empty hides the embed.
     "grafana_dashboard_url": "",
+    # Trust & KYC. VIP badge can be bought (vip_price for vip_duration_days) or
+    # earned by reputation (rating ≥ min AND reviews ≥ min). KYC = document check.
+    "trust_badges_enabled": "true",
+    "vip_price": "990",
+    "vip_duration_days": "30",
+    "vip_auto_rating_min": "4.8",
+    "vip_auto_reviews_min": "50",
+    "kyc_required_for_payout": "false",
 }
 
 DESCRIPTIONS: Dict[str, str] = {

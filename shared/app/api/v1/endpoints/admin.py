@@ -542,6 +542,62 @@ async def shop_detail(
     }
 
 
+# ─── Seller KYC verification ───────────────────────────────────────────────────
+
+@router.get("/verifications")
+async def list_verifications(
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_moderator_or_admin),
+    status_filter: Optional[str] = Query("pending", alias="status"),
+):
+    import json
+    from app.models.models import SellerVerification
+    query = select(SellerVerification, Shop).join(Shop, Shop.id == SellerVerification.shop_id)
+    if status_filter:
+        query = query.where(SellerVerification.status == status_filter)
+    rows = (await db.execute(query.order_by(SellerVerification.submitted_at.desc()))).all()
+    return [
+        {"shop_id": v.shop_id, "shop_name": s.name,
+         "status": v.status.value if hasattr(v.status, "value") else v.status,
+         "note": v.note, "reason": v.reason,
+         "documents": json.loads(v.document_keys) if v.document_keys else [],
+         "submitted_at": v.submitted_at.isoformat()}
+        for v, s in rows
+    ]
+
+
+@router.post("/verifications/{shop_id}/review")
+async def review_verification(
+    shop_id: int,
+    payload: dict,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_moderator_or_admin),
+):
+    from app.services.trust_service import review_kyc
+    from app.services.audit_service import log_action
+    from app.services.notification_service import notify
+    from app.models.models import NotificationType, Shop as _Shop
+    approve = bool(payload.get("approve"))
+    reason = payload.get("reason") or ""
+    if not approve and not reason:
+        raise HTTPException(status_code=400, detail="Укажите причину отклонения")
+    try:
+        rec = await review_kyc(db, shop_id, approve, current_user.id, reason)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    await log_action(db, current_user.id, f"kyc.{'approved' if approve else 'rejected'}", "shop", shop_id, detail=reason)
+    shop = (await db.execute(select(_Shop).where(_Shop.id == shop_id))).scalar_one_or_none()
+    if shop:
+        await notify(
+            db, shop.owner_id, NotificationType.system,
+            title="Верификация: " + ("одобрена" if approve else "отклонена"),
+            body=reason or ("Магазин получил бейдж «Проверенный»" if approve else ""),
+            link="/seller/trust", send_email=True,
+        )
+    await db.commit()
+    return {"status": rec.status.value if hasattr(rec.status, "value") else rec.status}
+
+
 # ─── Products (moderation) ────────────────────────────────────────────────────
 
 @router.get("/products", response_model=dict)

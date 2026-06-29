@@ -172,6 +172,8 @@ class ShopOut(OrmBase):
     rating: Decimal
     reviews_count: int = 0
     total_sales: int
+    kyc_verified: bool = False
+    vip_until: Optional[datetime] = None
     created_at: datetime
 
 

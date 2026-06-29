@@ -233,6 +233,16 @@ export const shopsApi = {
   updateMember: (userId: number, data: { role?: string; permissions?: string[] }) =>
     api.patch(`/shops/my/members/${userId}`, data).then(r => r.data),
   removeMember: (userId: number) => api.delete(`/shops/my/members/${userId}`),
+
+  // Trust / KYC / VIP
+  getTrust: () => api.get<any>('/shops/my/trust').then(r => r.data),
+  submitKyc: (files: File[]) => {
+    const fd = new FormData()
+    files.forEach((f) => fd.append('files', f))
+    return api.post('/shops/my/kyc', fd).then(r => r.data)
+  },
+  buyVip: () => api.post('/shops/my/vip').then(r => r.data),
+  badge: (id: number) => api.get<{ badge: string | null }>(`/shops/${id}/badge`).then(r => r.data),
 }
 
 // ─── Cart ─────────────────────────────────────────────────────────────────────
@@ -361,6 +371,10 @@ export const adminApi = {
     api.get<any>(`/admin/shops/${id}/requisites`).then(r => r.data),
   shopDetail: (id: number) =>
     api.get<any>(`/admin/shops/${id}/detail`).then(r => r.data),
+  listVerifications: (status = 'pending') =>
+    api.get<any[]>('/admin/verifications', { params: { status } }).then(r => r.data),
+  reviewVerification: (shopId: number, approve: boolean, reason?: string) =>
+    api.post(`/admin/verifications/${shopId}/review`, { approve, reason }).then(r => r.data),
   // Block D: SMS (SMSC.ru) section
   smsStatus: () => api.get<any>('/admin/sms/status').then(r => r.data),
   smsUpdateSettings: (data: Record<string, any>) =>

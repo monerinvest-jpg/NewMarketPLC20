@@ -33,6 +33,7 @@ const groups = [
     children: [
       { key: '/admin/users', icon: <UserOutlined />, label: 'Пользователи' },
       { key: '/admin/shops', icon: <ShopOutlined />, label: 'Магазины' },
+      { key: '/admin/verifications', icon: <SafetyCertificateOutlined />, label: 'Верификация продавцов' },
       { key: '/admin/moderators', icon: <TeamOutlined />, label: 'Модераторы' },
     ],
   },

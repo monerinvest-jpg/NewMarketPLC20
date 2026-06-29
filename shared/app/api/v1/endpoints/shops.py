@@ -1,7 +1,7 @@
 """
 Shop management endpoints (seller).
 """
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -311,6 +311,92 @@ async def remove_member(
     if member:
         await db.delete(member)
         await db.commit()
+
+
+# ─── Trust: KYC verification + VIP badge ───────────────────────────────────────
+
+@router.get("/my/trust")
+async def my_trust_status(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_seller),
+):
+    """Badge, VIP expiry, KYC status and pricing for the current shop."""
+    import json as _json
+    from app.services.shop_membership_service import resolve_shop_id
+    from app.services.trust_service import trust_config, compute_badge
+    from app.models.models import SellerVerification
+    shop_id = await resolve_shop_id(db, current_user)
+    shop = (await db.execute(select(Shop).where(Shop.id == shop_id))).scalar_one_or_none() if shop_id else None
+    if not shop:
+        raise HTTPException(status_code=404, detail="Shop not found")
+    cfg = await trust_config(db)
+    rec = (await db.execute(select(SellerVerification).where(SellerVerification.shop_id == shop_id))).scalar_one_or_none()
+    return {
+        "badge": compute_badge(shop, cfg),
+        "kyc_verified": shop.kyc_verified,
+        "vip_until": shop.vip_until.isoformat() if shop.vip_until else None,
+        "vip_price": str(cfg["vip_price"]),
+        "vip_days": cfg["vip_days"],
+        "rating": str(shop.rating), "reviews_count": shop.reviews_count,
+        "vip_auto_rating_min": str(cfg["rating_min"]), "vip_auto_reviews_min": cfg["reviews_min"],
+        "kyc": None if not rec else {
+            "status": rec.status.value if hasattr(rec.status, "value") else rec.status,
+            "reason": rec.reason,
+            "documents": _json.loads(rec.document_keys) if rec.document_keys else [],
+        },
+    }
+
+
+@router.post("/my/kyc")
+async def submit_kyc_docs(
+    files: list[UploadFile] = File(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_seller),
+):
+    """Upload KYC documents (stored privately) and submit for review."""
+    from app.services.shop_membership_service import resolve_shop_id, is_owner
+    from app.services import digital_storage_service
+    from app.services.trust_service import submit_kyc
+    shop_id = await resolve_shop_id(db, current_user)
+    if not shop_id or not await is_owner(db, current_user, shop_id):
+        raise HTTPException(status_code=403, detail="Только владелец может подавать документы")
+    keys: list[str] = []
+    for f in files[:10]:
+        content = await f.read()
+        try:
+            key, _ = await digital_storage_service.save_digital_asset(content, f.content_type or "", f.filename or "doc")
+            keys.append(key)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+    rec = await submit_kyc(db, shop_id, keys)
+    await db.commit()
+    return {"status": rec.status.value}
+
+
+@router.post("/my/vip")
+async def buy_vip_badge(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_seller),
+):
+    from app.services.shop_membership_service import resolve_shop_id, is_owner
+    from app.services.trust_service import buy_vip
+    shop_id = await resolve_shop_id(db, current_user)
+    shop = (await db.execute(select(Shop).where(Shop.id == shop_id))).scalar_one_or_none() if shop_id else None
+    if not shop or not await is_owner(db, current_user, shop_id):
+        raise HTTPException(status_code=403, detail="Только владелец может купить VIP")
+    try:
+        await buy_vip(db, current_user, shop)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    await db.commit()
+    return {"vip_until": shop.vip_until.isoformat() if shop.vip_until else None}
+
+
+@router.get("/{shop_id}/badge")
+async def shop_badge(shop_id: int, db: AsyncSession = Depends(get_db)):
+    """Public: the trust badge for a shop (verified | vip | null)."""
+    from app.services.trust_service import badge_for_shop_id
+    return {"badge": await badge_for_shop_id(db, shop_id)}
 
 
 @router.put("/my", response_model=ShopOut)
