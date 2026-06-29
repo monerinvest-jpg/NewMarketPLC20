@@ -1,0 +1,72 @@
+name: CI
+
+# Build + test on every push and pull request. Keeps main releasable.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend (lint + tests)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: shared/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r shared/requirements.txt
+
+      - name: Byte-compile shared app + every service entrypoint
+        run: |
+          python -m compileall -q shared/app
+          for s in identity catalog orders sellers platform worker; do
+            python -m py_compile services/$s/main.py
+          done
+
+      - name: Validate Alembic migration chain imports
+        working-directory: shared
+        run: python -m compileall -q alembic/versions
+
+      - name: Run unit tests
+        working-directory: shared
+        env:
+          PYTHONPATH: ${{ github.workspace }}/shared
+        run: pytest tests -v
+
+  frontend:
+    name: Frontend (build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Type-check (non-blocking)
+        working-directory: frontend
+        run: npx tsc --noEmit
+        continue-on-error: true
+
+      - name: Production build
+        working-directory: frontend
+        run: npx vite build

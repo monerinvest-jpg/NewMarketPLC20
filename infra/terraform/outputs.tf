@@ -65,6 +65,16 @@ postgres_user=handmade_user
 postgres_database=${var.project_name}_${var.environment}
 redis_host=${yandex_mdb_redis_cluster.cache.host[0].fqdn}
 redis_password=${random_password.redis_password.result}
+s3_endpoint=https://storage.yandexcloud.net
+s3_bucket=${yandex_storage_bucket.assets.bucket}
+s3_access_key=${yandex_iam_service_account_static_access_key.storage_key.access_key}
+s3_secret_key=${yandex_iam_service_account_static_access_key.storage_key.secret_key}
+s3_public_url=https://storage.yandexcloud.net/${yandex_storage_bucket.assets.bucket}
+smtp_host=postbox.cloud.yandex.net
+smtp_port=587
+smtp_user=${yandex_iam_service_account_static_access_key.mail_key.access_key}
+smtp_password=${yandex_iam_service_account_static_access_key.mail_key.secret_key}
+smtp_from=${var.smtp_from}
 ansible_ssh_common_args='-o ProxyCommand="ssh -W %h:%p -q -o StrictHostKeyChecking=no ubuntu@${yandex_compute_instance.bastion.network_interface[0].nat_ip_address}" -o StrictHostKeyChecking=no'
 EOT
 }

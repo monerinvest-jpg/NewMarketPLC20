@@ -78,6 +78,9 @@ async def _save_s3(content: bytes, content_type: str, filename: str) -> str:
         Key=filename,
         Body=content,
         ContentType=content_type,
+        # Product images are public; the bucket is otherwise private (digital
+        # goods stay private and are served via presigned URLs / gated proxy).
+        ACL="public-read",
     )
     public_base = getattr(settings, "S3_PUBLIC_URL", "").rstrip("/")
     if public_base:

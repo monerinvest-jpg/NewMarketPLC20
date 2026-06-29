@@ -37,6 +37,20 @@ variable "service_account_id" {
   type        = string
 }
 
+# ─── Object storage + email (Postbox) ──────────────────────────────────────────
+
+variable "postbox_sender_role" {
+  description = "IAM role granting Postbox SMTP send rights to the mail service account"
+  type        = string
+  default     = "postbox.sender"
+}
+
+variable "smtp_from" {
+  description = "Verified Postbox sender address used as the From: header"
+  type        = string
+  default     = "no-reply@example.com"
+}
+
 variable "kong_count" {
   description = "Number of Kong instances"
   type        = number

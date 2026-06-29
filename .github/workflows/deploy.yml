@@ -1,0 +1,94 @@
+name: Build & Deploy
+
+# Manual release pipeline: build all service images, push them to Yandex
+# Container Registry, then (optionally) re-run the Ansible deploy so the backend
+# nodes pull the new images with their full env contract.
+#
+# Required repository secrets:
+#   YC_SA_KEY_JSON   — JSON key of a service account with container-registry.images.pusher
+#   YC_REGISTRY_ID   — registry id (e.g. crp8b0ggroptcd9dso2t)
+# Optional (enable the deploy job — re-runs Ansible against the live infra):
+#   DEPLOY_SSH_KEY     — private SSH key for the bastion/backend hosts
+#   ANSIBLE_INVENTORY  — base64 of infra/ansible inventory.ini
+#   ANSIBLE_GROUP_VARS — base64 of infra/ansible/group_vars/all.yml (DB/Redis/Kong secrets)
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "Image tag to build/push"
+        default: "latest"
+        required: true
+      run_deploy:
+        description: "Re-run Ansible deploy after push"
+        type: boolean
+        default: false
+
+env:
+  REGISTRY: cr.yandex/${{ secrets.YC_REGISTRY_ID }}
+
+jobs:
+  build-push:
+    name: Build & push images
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Yandex Cloud CLI
+        run: |
+          curl -sSL https://storage.yandexcloud.net/yandexcloud-yc/install.sh | bash -s -- -i "$HOME/yandex-cloud" -n
+          echo "$HOME/yandex-cloud/bin" >> "$GITHUB_PATH"
+
+      - name: Authenticate to Yandex Cloud
+        run: |
+          echo '${{ secrets.YC_SA_KEY_JSON }}' > sa-key.json
+          yc config set service-account-key sa-key.json
+          yc container registry configure-docker
+
+      - name: Build & push all services
+        run: |
+          set -e
+          for s in identity catalog orders sellers platform worker; do
+            echo "::group::$s"
+            docker build -f services/$s/Dockerfile \
+              -t "$REGISTRY/handmade-$s:${{ inputs.image_tag }}" .
+            docker push "$REGISTRY/handmade-$s:${{ inputs.image_tag }}"
+            echo "::endgroup::"
+          done
+
+      - name: Clean up credentials
+        if: always()
+        run: rm -f sa-key.json
+
+  deploy:
+    name: Ansible deploy (optional)
+    needs: build-push
+    if: ${{ inputs.run_deploy }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python + Ansible
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install ansible
+
+      - name: Restore SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Restore inventory + group_vars from secrets
+        working-directory: infra/ansible
+        run: |
+          echo "${{ secrets.ANSIBLE_INVENTORY }}" | base64 -d > inventory.ini
+          mkdir -p group_vars
+          echo "${{ secrets.ANSIBLE_GROUP_VARS }}" | base64 -d > group_vars/all.yml
+
+      - name: Run deploy playbook
+        working-directory: infra/ansible
+        env:
+          ANSIBLE_HOST_KEY_CHECKING: "False"
+        run: ansible-playbook -i inventory.ini deploy-services.yml
