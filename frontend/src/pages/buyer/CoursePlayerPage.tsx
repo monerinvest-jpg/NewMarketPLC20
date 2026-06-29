@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import {
   Layout, Menu, Typography, Progress, Button, Spin, Tag, message, Result, Space, Radio, Alert,
+  Modal, Input,
 } from 'antd'
 import {
   LockOutlined, CheckCircleTwoTone, PlayCircleOutlined, FilePdfOutlined,
@@ -48,6 +49,8 @@ export default function CoursePlayerPage() {
   const [mediaLoading, setMediaLoading] = useState(false)
   const [quizAnswers, setQuizAnswers] = useState<number[]>([])
   const [quizResult, setQuizResult] = useState<QuizResult | null>(null)
+  const [certModal, setCertModal] = useState(false)
+  const [certName, setCertName] = useState('')
   const blobRef = useRef<string | null>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
   const hlsRef = useRef<Hls | null>(null)
@@ -143,13 +146,22 @@ export default function CoursePlayerPage() {
     } catch { message.error('Ошибка отправки') }
   }
 
-  const downloadCertificate = async () => {
+  const openCertModal = () => {
+    setCertName(user?.full_name || '')
+    setCertModal(true)
+  }
+
+  const confirmCertificate = async () => {
+    const name = certName.trim()
+    if (!name) { message.error('Укажите ФИО'); return }
     try {
-      const resp = await coursesApi.certificatePdf(pid)
-      const url = URL.createObjectURL(new Blob([resp.data]))
+      await coursesApi.issueCertificate(pid, name)            // set the recipient name (ФИО)
+      const resp = await coursesApi.certificatePdf(pid)        // then render the PDF
+      const url = URL.createObjectURL(new Blob([resp.data], { type: 'application/pdf' }))
       const a = document.createElement('a')
       a.href = url; a.download = `certificate-${pid}.pdf`; a.click()
       URL.revokeObjectURL(url)
+      setCertModal(false)
     } catch (e: any) {
       message.error(e.response?.data?.detail || 'Сертификат недоступен')
     }
@@ -178,7 +190,7 @@ export default function CoursePlayerPage() {
           <Progress percent={course.progress_percent} size="small" style={{ marginTop: 8 }} />
           <Text type="secondary">{course.completed_lessons} из {course.total_lessons} уроков</Text>
           {course.enrolled && course.progress_percent >= 100 && (
-            <Button block type="primary" icon={<TrophyOutlined />} style={{ marginTop: 8 }} onClick={downloadCertificate}>
+            <Button block type="primary" icon={<TrophyOutlined />} style={{ marginTop: 8 }} onClick={openCertModal}>
               Сертификат
             </Button>
           )}
@@ -290,6 +302,22 @@ export default function CoursePlayerPage() {
           </div>
         )}
       </Content>
+
+      <Modal
+        title="Получить сертификат"
+        open={certModal}
+        onCancel={() => setCertModal(false)}
+        onOk={confirmCertificate}
+        okText="Скачать сертификат"
+      >
+        <p>Укажите ФИО так, как оно должно быть напечатано в сертификате:</p>
+        <Input
+          value={certName}
+          onChange={(e) => setCertName(e.target.value)}
+          placeholder="Иванов Иван Иванович"
+          onPressEnter={confirmCertificate}
+        />
+      </Modal>
     </Layout>
   )
 }

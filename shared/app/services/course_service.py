@@ -146,6 +146,8 @@ async def build_curriculum(
         level=course.level,
         language=course.language,
         has_intro_video=bool(course.intro_video_key),
+        cert_instructor=course.cert_instructor,
+        has_cert_logo=bool(course.cert_logo_key),
         enrolled=enrolled,
         total_lessons=total_lessons,
         completed_lessons=completed_lessons,

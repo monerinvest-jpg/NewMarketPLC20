@@ -200,6 +200,8 @@ export interface CourseDetail {
   level?: string | null
   language?: string | null
   has_intro_video: boolean
+  cert_instructor?: string | null
+  has_cert_logo: boolean
   enrolled: boolean
   total_lessons: number
   completed_lessons: number

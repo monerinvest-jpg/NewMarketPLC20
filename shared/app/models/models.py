@@ -548,6 +548,9 @@ class Course(Base):
     level: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)        # beginner/intermediate/advanced
     language: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
     intro_video_key: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)  # private promo video
+    # Certificate customization (seller-controlled)
+    cert_instructor: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)  # instructor / signatory name
+    cert_logo_key: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)    # private logo image key
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False)
 

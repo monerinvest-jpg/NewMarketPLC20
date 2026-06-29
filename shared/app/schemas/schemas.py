@@ -293,6 +293,11 @@ class EntitlementOut(BaseModel):
 class CourseUpsert(BaseModel):
     level: Optional[str] = None
     language: Optional[str] = None
+    cert_instructor: Optional[str] = None
+
+
+class CertificateIssue(BaseModel):
+    recipient_name: Optional[str] = None   # buyer's full name (ФИО) for the certificate
 
 
 class ModuleCreate(BaseModel):
@@ -386,6 +391,8 @@ class CourseOut(BaseModel):
     level: Optional[str] = None
     language: Optional[str] = None
     has_intro_video: bool = False
+    cert_instructor: Optional[str] = None
+    has_cert_logo: bool = False
     enrolled: bool = False
     total_lessons: int = 0
     completed_lessons: int = 0

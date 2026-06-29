@@ -142,8 +142,8 @@ export const coursesApi = {
     `${import.meta.env.VITE_API_URL || ''}/api/v1/courses/${productId}/lessons/${lessonId}/hls/index.m3u8`,
 
   // Certificates
-  getCertificate: (productId: number) =>
-    api.get<Certificate>(`/courses/${productId}/certificate`).then(r => r.data),
+  issueCertificate: (productId: number, recipient_name: string) =>
+    api.post<Certificate>(`/courses/${productId}/certificate`, { recipient_name }).then(r => r.data),
   certificatePdf: (productId: number) =>
     api.get(`/courses/${productId}/certificate/pdf`, { responseType: 'blob' }),
   verifyCertificate: (code: string) =>
@@ -151,8 +151,15 @@ export const coursesApi = {
 
   // Seller course builder
   builder: (productId: number) => api.get<CourseDetail>(`/courses/${productId}/builder`).then(r => r.data),
-  updateSettings: (productId: number, data: { level?: string; language?: string }) =>
+  updateSettings: (productId: number, data: { level?: string; language?: string; cert_instructor?: string }) =>
     api.put<CourseDetail>(`/courses/${productId}/settings`, data).then(r => r.data),
+  uploadCertLogo: (productId: number, file: File) => {
+    const form = new FormData()
+    form.append('file', file)
+    return api.post(`/courses/${productId}/certificate/logo`, form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }).then(r => r.data)
+  },
   addModule: (productId: number, data: { title: string; sort_order?: number }) =>
     api.post(`/courses/${productId}/modules`, data).then(r => r.data),
   updateModule: (productId: number, moduleId: number, data: { title?: string; sort_order?: number }) =>

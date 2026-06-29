@@ -20,7 +20,7 @@ from app.models.models import (
     Product, ProductType, QuizAttempt, Shop, User,
 )
 from app.schemas.schemas import (
-    CertificateOut, CourseOut, CourseUpsert, LessonCreate, LessonOut, LessonUpdate,
+    CertificateIssue, CertificateOut, CourseOut, CourseUpsert, LessonCreate, LessonOut, LessonUpdate,
     ModuleCreate, ModuleOut, ModuleUpdate, QuizResultOut, QuizSubmit,
 )
 from app.services import certificate_service, course_service, digital_storage_service
@@ -250,18 +250,18 @@ async def submit_quiz(
 
 # ─── certificates ─────────────────────────────────────────────────────────────
 
-async def _issue_cert(db: AsyncSession, user: User, product_id: int):
+async def _issue_cert(db: AsyncSession, user: User, product_id: int, recipient_name=None):
     if not await course_service.has_access(db, user, product_id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Курс не приобретён")
     product = (await db.execute(select(Product).where(Product.id == product_id))).scalar_one_or_none()
     course = await course_service.get_course_for_product(db, product_id)
     if not product or not course:
         raise HTTPException(status_code=404, detail="Курс не найден")
-    cert = await certificate_service.issue(db, user, course, product)
+    cert = await certificate_service.issue(db, user, course, product, recipient_name=recipient_name)
     if not cert:
         raise HTTPException(status_code=400, detail="Курс ещё не завершён на 100%")
     await db.commit()
-    return cert
+    return cert, course
 
 
 @router.get("/certificates/{code}", response_model=CertificateOut)
@@ -276,13 +276,15 @@ async def verify_certificate(code: str, db: AsyncSession = Depends(get_db)):
     )
 
 
-@router.get("/{product_id}/certificate", response_model=CertificateOut)
-async def get_certificate(
+@router.post("/{product_id}/certificate", response_model=CertificateOut)
+async def issue_certificate(
     product_id: int,
+    payload: CertificateIssue,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    cert = await _issue_cert(db, current_user, product_id)
+    """Issue the completion certificate, using the buyer-supplied full name (ФИО)."""
+    cert, _ = await _issue_cert(db, current_user, product_id, recipient_name=payload.recipient_name)
     return CertificateOut(
         code=cert.code, course_id=cert.course_id, product_id=cert.product_id,
         course_title=cert.course_title, recipient_name=cert.recipient_name, issued_at=cert.issued_at,
@@ -295,12 +297,36 @@ async def get_certificate_pdf(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    cert = await _issue_cert(db, current_user, product_id)
-    pdf = certificate_service.render_pdf(cert)
+    cert, course = await _issue_cert(db, current_user, product_id)
+    pdf = certificate_service.render_pdf(cert, course)
     return Response(
         content=pdf, media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="certificate-{cert.code}.pdf"'},
     )
+
+
+@router.post("/{product_id}/certificate/logo")
+async def upload_certificate_logo(
+    product_id: int,
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_seller),
+):
+    """Seller uploads a logo image shown on the course's certificates."""
+    product = await _seller_product(db, current_user, product_id)
+    course = await course_service.ensure_course(db, product)
+    content = await file.read()
+    try:
+        key, _ = await digital_storage_service.save_digital_asset(
+            content, file.content_type or "image/png", file.filename or "logo.png",
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    if course.cert_logo_key:
+        digital_storage_service.delete_digital_asset(course.cert_logo_key)
+    course.cert_logo_key = key
+    await db.commit()
+    return {"ok": True}
 
 
 # ─── buyer: my courses ────────────────────────────────────────────────────────

@@ -29,6 +29,7 @@ export default function SellerCourseBuilder() {
   const navigate = useNavigate()
   const [course, setCourse] = useState<CourseDetail | null>(null)
   const [loading, setLoading] = useState(true)
+  const [instructor, setInstructor] = useState('')
 
   const [moduleModal, setModuleModal] = useState(false)
   const [moduleForm] = Form.useForm()
@@ -54,7 +55,9 @@ export default function SellerCourseBuilder() {
 
   const load = async () => {
     try {
-      setCourse(await coursesApi.builder(pid))
+      const c = await coursesApi.builder(pid)
+      setCourse(c)
+      setInstructor(c.cert_instructor || '')
     } catch {
       message.error('Не удалось открыть курс')
     } finally {
@@ -62,6 +65,22 @@ export default function SellerCourseBuilder() {
     }
   }
   useEffect(() => { load() }, [pid])
+
+  const saveCertSettings = async () => {
+    await coursesApi.updateSettings(pid, { cert_instructor: instructor })
+    message.success('Настройки сертификата сохранены')
+    load()
+  }
+
+  const uploadCertLogo = async (file: File) => {
+    try {
+      await coursesApi.uploadCertLogo(pid, file)
+      message.success('Логотип загружен')
+      load()
+    } catch (e: any) {
+      message.error(e.response?.data?.detail || 'Ошибка загрузки')
+    }
+  }
 
   const addModule = async (v: any) => {
     await coursesApi.addModule(pid, v)
@@ -133,6 +152,23 @@ export default function SellerCourseBuilder() {
         <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/seller/products')}>Назад</Button>
         <Title level={3} style={{ margin: 0 }}>Курс: {course.title}</Title>
       </Space>
+
+      <Card size="small" title="Сертификат курса" style={{ marginBottom: 16 }}>
+        <Space direction="vertical" style={{ width: '100%' }}>
+          <Space.Compact style={{ width: '100%', maxWidth: 520 }}>
+            <Input value={instructor} onChange={(e) => setInstructor(e.target.value)}
+              placeholder="Преподаватель / подпись (печатается в сертификате)" />
+            <Button type="primary" onClick={saveCertSettings}>Сохранить</Button>
+          </Space.Compact>
+          <Space>
+            <Upload showUploadList={false} accept="image/*" beforeUpload={(f) => { uploadCertLogo(f as File); return false }}>
+              <Button icon={<UploadOutlined />}>{course.has_cert_logo ? 'Заменить логотип' : 'Загрузить логотип'}</Button>
+            </Upload>
+            {course.has_cert_logo && <Tag color="blue">логотип загружен</Tag>}
+            <Text type="secondary">Кириллица в сертификате поддерживается.</Text>
+          </Space>
+        </Space>
+      </Card>
 
       <div style={{ marginBottom: 16 }}>
         <Button type="primary" icon={<PlusOutlined />} onClick={() => setModuleModal(true)}>Добавить модуль</Button>
