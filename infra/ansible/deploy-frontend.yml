@@ -1,0 +1,62 @@
+# Deploy the frontend SPA as its OWN container, independently of the backend.
+#
+# The image embeds no backend hostname: the SPA calls /api/v1 at the same origin
+# it is served from. Kong is that single origin — it already routes /api/v1/*,
+# /health and /uploads to the backend services; here we add a low-priority
+# catch-all route so every OTHER path is served by the frontend container.
+#
+# Because nothing here touches the backend, you can ship a new frontend without
+# redeploying services:   ansible-playbook -i hosts.ini deploy-frontend.yml
+---
+- name: Run the frontend container
+  hosts: backend
+  become: true
+  vars:
+    registry: "cr.yandex/crp8b0ggroptcd9dso2t"
+    image_tag: "latest"
+    frontend_port: 3000
+  tasks:
+    - name: Ensure Docker is present
+      apt: { name: docker.io, state: present, update_cache: true }
+
+    - name: Authenticate Docker to Yandex Container Registry
+      shell: |
+        set -e
+        TOKEN=$(curl -s -H "Metadata-Flavor: Google" \
+          "http://169.254.169.254/computeMetadata/v1/instance/service-accounts/default/token" \
+          | python3 -c "import sys,json;print(json.load(sys.stdin)['access_token'])")
+        echo "$TOKEN" | docker login --username iam --password-stdin cr.yandex
+      changed_when: false
+
+    - name: Run the frontend SPA container
+      shell: >
+        docker rm -f handmade-frontend 2>/dev/null || true;
+        docker run -d --pull always --name handmade-frontend --restart always
+        -p {{ frontend_port }}:3000
+        {{ registry }}/handmade-frontend:{{ image_tag }}
+      changed_when: false
+
+- name: Route all non-API traffic to the frontend (Kong catch-all)
+  hosts: kong
+  run_once: true
+  become: true
+  vars:
+    kong_admin: "http://localhost:8001"
+    frontend_host: "{{ hostvars[groups['backend'][0]].ansible_host | default(groups['backend'][0]) }}"
+  tasks:
+    - name: Upsert the Kong 'frontend' service
+      uri:
+        url: "{{ kong_admin }}/services/frontend"
+        method: PUT
+        body_format: form-urlencoded
+        body:
+          url: "http://{{ frontend_host }}:3000"
+        status_code: [200, 201]
+
+    - name: Catch-all route '/' to the frontend (API prefixes are longer → they win)
+      uri:
+        url: "{{ kong_admin }}/services/frontend/routes"
+        method: POST
+        body_format: form-urlencoded
+        body: "name=frontend-spa&strip_path=false&paths[]=/"
+        status_code: [200, 201, 409]

@@ -11,4 +11,12 @@ for s in identity catalog orders sellers platform worker; do
   echo "Done $s"
 done
 
-echo "All services built and pushed!"
+# Frontend is an independent image (own context, own lifecycle). Built with NO
+# VITE_API_URL so the SPA calls the API at the relative /api/v1 (same origin as
+# the edge that serves it) — no backend hostname baked in.
+echo "Building and pushing frontend..."
+docker build -f frontend/Dockerfile -t $REG/handmade-frontend:latest frontend
+docker push $REG/handmade-frontend:latest
+echo "Done frontend"
+
+echo "All images built and pushed!"

@@ -59,6 +59,35 @@ jobs:
         if: always()
         run: rm -f sa-key.json
 
+  build-push-frontend:
+    # Independent of the backend: the frontend image carries no backend hostname
+    # (relative /api/v1), so it can be rebuilt and shipped on its own schedule.
+    name: Build & push frontend image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Yandex Cloud CLI
+        run: |
+          curl -sSL https://storage.yandexcloud.net/yandexcloud-yc/install.sh | bash -s -- -i "$HOME/yandex-cloud" -n
+          echo "$HOME/yandex-cloud/bin" >> "$GITHUB_PATH"
+
+      - name: Authenticate to Yandex Cloud
+        run: |
+          echo '${{ secrets.YC_SA_KEY_JSON }}' > sa-key.json
+          yc config set service-account-key sa-key.json
+          yc container registry configure-docker
+
+      - name: Build & push frontend
+        run: |
+          docker build -f frontend/Dockerfile \
+            -t "$REGISTRY/handmade-frontend:${{ inputs.image_tag }}" frontend
+          docker push "$REGISTRY/handmade-frontend:${{ inputs.image_tag }}"
+
+      - name: Clean up credentials
+        if: always()
+        run: rm -f sa-key.json
+
   deploy:
     name: Ansible deploy (optional)
     needs: build-push
