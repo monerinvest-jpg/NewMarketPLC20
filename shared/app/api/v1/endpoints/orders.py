@@ -241,6 +241,17 @@ async def create_order(
 
     free_order = total_price <= Decimal("0.00")
 
+    # BNPL ("Сплит"): the provider settles the marketplace upfront, so the order
+    # is paid immediately and the buyer repays in parts per the schedule.
+    bnpl = False
+    bnpl_cfg = None
+    if payload.payment_method == "split" and not free_order:
+        from app.services import bnpl_service
+        bnpl_cfg = await bnpl_service.config(db)
+        if not bnpl_service.is_eligible(total_price, bnpl_cfg):
+            raise HTTPException(status_code=400, detail="Оплата частями недоступна для этого заказа")
+        bnpl = True
+
     # 8. Create order
     order = Order(
         buyer_id=current_user.id,
@@ -352,16 +363,22 @@ async def create_order(
 
     await db.flush()
 
-    # 13/14 (free order): the referral balance fully covered the total — no
-    # gateway charge. Mark it paid, grant any digital access, and complete a
-    # digital-only order immediately (mirrors the YooKassa success webhook).
-    if free_order:
+    # 13/14 (paid upfront): either the referral balance fully covered the total
+    # (free order) OR a BNPL provider settled the marketplace upfront. No gateway
+    # charge — mark it paid, record the installment plan (BNPL), grant digital
+    # access, and complete a digital-only order (mirrors the YooKassa webhook).
+    if free_order or bnpl:
         from datetime import datetime, timezone
         payment = Payment(
-            order_id=order.id, gateway=PaymentGateway.yookassa, amount=Decimal("0.00"),
+            order_id=order.id,
+            gateway=PaymentGateway.split if bnpl else PaymentGateway.yookassa,
+            amount=order.total_price if bnpl else Decimal("0.00"),
             status=PaymentStatus.succeeded, paid_at=datetime.now(timezone.utc),
         )
         db.add(payment)
+        if bnpl:
+            from app.services import bnpl_service
+            await bnpl_service.create_for_order(db, order, bnpl_cfg)
         order.status = OrderStatus.paid
         await db.flush()
         order_full = (await db.execute(
@@ -740,6 +757,31 @@ async def update_order_status(
     await db.commit()
     await db.refresh(order)
     return order
+
+
+@router.get("/{order_id}/installment-plan")
+async def get_installment_plan(
+    order_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """The BNPL schedule for an order (buyer-owned). Returns null if not on a plan."""
+    import json
+    from app.models.models import InstallmentPlan
+    order = (await db.execute(select(Order).where(Order.id == order_id))).scalar_one_or_none()
+    if not order or order.buyer_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Order not found")
+    plan = (await db.execute(
+        select(InstallmentPlan).where(InstallmentPlan.order_id == order_id)
+    )).scalar_one_or_none()
+    if not plan:
+        return None
+    return {
+        "provider": plan.provider, "total": str(plan.total),
+        "parts": plan.parts, "part_amount": str(plan.part_amount),
+        "status": plan.status,
+        "schedule": json.loads(plan.schedule) if plan.schedule else [],
+    }
 
 
 @router.get("/{order_id}/receipts", response_model=list[FiscalReceiptOut])

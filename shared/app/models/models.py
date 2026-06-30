@@ -121,6 +121,7 @@ class PaymentStatus(str, enum.Enum):
 class PaymentGateway(str, enum.Enum):
     yookassa = "yookassa"
     cloudpayments = "cloudpayments"
+    split = "split"            # BNPL / installments (pay in parts)
 
 
 class FiscalReceiptType(str, enum.Enum):
@@ -467,6 +468,22 @@ class Campaign(Base):
     created_by_id: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("user.id"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
     sent_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class InstallmentPlan(Base):
+    """A BNPL / pay-in-parts plan for an order. The provider settles the
+    marketplace upfront; the buyer repays the provider per the schedule."""
+    __tablename__ = "installment_plan"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    order_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("order.id"), unique=True, nullable=False)
+    provider: Mapped[str] = mapped_column(String(40), default="split", nullable=False)
+    total: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    parts: Mapped[int] = mapped_column(Integer, nullable=False)
+    part_amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    schedule: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # JSON list of {due_date, amount}
+    status: Mapped[str] = mapped_column(String(20), default="active", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
 
 
 class Category(Base):

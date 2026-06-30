@@ -204,7 +204,15 @@ async def update_profile(
 async def public_config(db: AsyncSession = Depends(get_db)):
     """Whitelisted public settings the storefront needs (no auth)."""
     from app.services.settings_service import get_setting
-    return {"gift_wrap_price": await get_setting(db, "gift_wrap_price")}
+    from app.services import bnpl_service
+    cfg = await bnpl_service.config(db)
+    return {
+        "gift_wrap_price": await get_setting(db, "gift_wrap_price"),
+        "bnpl": {
+            "enabled": cfg["enabled"], "provider": cfg["provider"],
+            "parts": cfg["parts"], "min_order": str(cfg["min_order"]),
+        },
+    }
 
 
 @users_router.get("/unsubscribe")

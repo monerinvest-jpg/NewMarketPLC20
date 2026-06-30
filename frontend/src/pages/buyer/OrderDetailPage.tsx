@@ -47,6 +47,7 @@ export default function OrderDetailPage() {
   const [returnModal, setReturnModal] = useState<{ open: boolean; itemId?: number; maxQty?: number }>({ open: false })
   const [returnReason, setReturnReason] = useState('')
   const [returnQty, setReturnQty] = useState(1)
+  const [installment, setInstallment] = useState<any>(null)
 
   const submitReturn = async () => {
     if (!returnModal.itemId) return
@@ -67,6 +68,7 @@ export default function OrderDetailPage() {
       .finally(() => setLoading(false))
     subOrdersApi.forOrder(parseInt(id!)).then(setSubOrders).catch(() => {})
     ordersApi.receipts(parseInt(id!)).then(setReceipts).catch(() => {})
+    ordersApi.installmentPlan(parseInt(id!)).then(setInstallment).catch(() => {})
   }, [id])
 
   if (loading) return <Spin size="large" style={{ display: 'block', margin: 80 }} />
@@ -196,6 +198,22 @@ export default function OrderDetailPage() {
           )}
         </Descriptions>
       </Card>
+
+      {installment && (
+        <Card size="small" title={`Оплата частями · ${installment.provider}`} style={{ marginBottom: 16 }}>
+          <Text type="secondary">
+            {installment.parts} платежа по ~{Number(installment.part_amount).toLocaleString('ru')} ₽
+          </Text>
+          <div style={{ marginTop: 8 }}>
+            {installment.schedule?.map((s: any, i: number) => (
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid #f3e3cf' }}>
+                <Text>{i === 0 ? 'Сегодня' : new Date(s.due_date).toLocaleDateString('ru')}</Text>
+                <Text strong>{Number(s.amount).toLocaleString('ru')} ₽</Text>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
 
       <Card title="Оплата">
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>

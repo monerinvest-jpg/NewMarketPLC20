@@ -518,6 +518,8 @@ class OrderCreate(BaseModel):
     is_gift: bool = False
     gift_wrap: bool = False
     gift_message: Optional[str] = Field(default=None, max_length=500)
+    # Payment method: "card" (YooKassa) | "split" (BNPL / pay in parts)
+    payment_method: str = "card"
 
 
 class OrderStatusUpdate(BaseModel):

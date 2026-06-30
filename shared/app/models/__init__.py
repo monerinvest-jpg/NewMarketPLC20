@@ -25,7 +25,7 @@ from app.models.models import (
     LessonType, Course, CourseModule, CourseLesson, LessonProgress,
     QuizAttempt, Certificate, PayoutSource, WithdrawalAccount,
     ShopMember, ShopMemberRole, SellerVerification, SellerVerificationStatus,
-    Campaign, CampaignChannel, CampaignStatus,
+    Campaign, CampaignChannel, CampaignStatus, InstallmentPlan,
 )
 
 __all__ = [
@@ -55,5 +55,5 @@ __all__ = [
     "LessonType", "Course", "CourseModule", "CourseLesson", "LessonProgress",
     "QuizAttempt", "Certificate", "PayoutSource", "WithdrawalAccount",
     "ShopMember", "ShopMemberRole", "SellerVerification", "SellerVerificationStatus",
-    "Campaign", "CampaignChannel", "CampaignStatus",
+    "Campaign", "CampaignChannel", "CampaignStatus", "InstallmentPlan",
 ]

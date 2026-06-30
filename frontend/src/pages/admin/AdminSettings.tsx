@@ -10,6 +10,8 @@ const sections: Record<string, { title: string; keys: string[] }> = {
   referral: { title: 'Реферальная программа', keys: ['referral_buyer_bonus_percent', 'referral_buyer_min_order_amount', 'referral_seller_bonus_percent', 'referral_bonus_max_discount_percent'] },
   orders: { title: 'Заказы', keys: ['order_auto_complete_days', 'order_auto_delivered_days'] },
   delivery: { title: 'Доставка', keys: ['delivery_enabled_services'] },
+  gifts: { title: 'Подарки', keys: ['gift_wrap_price'] },
+  bnpl: { title: 'Оплата частями (BNPL)', keys: ['bnpl_enabled', 'bnpl_provider_name', 'bnpl_parts', 'bnpl_interval_days', 'bnpl_min_order'] },
   trust: { title: 'Доверие и VIP', keys: ['trust_badges_enabled', 'vip_price', 'vip_duration_days', 'vip_auto_rating_min', 'vip_auto_reviews_min', 'kyc_required_for_payout'] },
   integrations: { title: 'Интеграции (API-ключи)', keys: ['yookassa_shop_id', 'yookassa_secret_key', 'cdek_client_id', 'cdek_client_secret'] },
 }

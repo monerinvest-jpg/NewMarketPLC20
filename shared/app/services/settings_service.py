@@ -55,6 +55,13 @@ DEFAULTS: Dict[str, str] = {
     "delivery_enabled_services": "cdek,ozon,yandex,russian_post",
     # Gift options: price of optional gift wrapping (added to order total).
     "gift_wrap_price": "150",
+    # BNPL / pay-in-parts (Split-style). The provider settles the marketplace
+    # upfront; the buyer repays in N parts. All admin-tunable.
+    "bnpl_enabled": "true",
+    "bnpl_provider_name": "Сплит",
+    "bnpl_parts": "4",
+    "bnpl_interval_days": "14",
+    "bnpl_min_order": "3000",
 }
 
 DESCRIPTIONS: Dict[str, str] = {

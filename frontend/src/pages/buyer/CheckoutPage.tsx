@@ -34,12 +34,17 @@ export default function CheckoutPage() {
   const [giftWrap, setGiftWrap] = useState(false)
   const [giftMessage, setGiftMessage] = useState('')
   const [giftWrapPrice, setGiftWrapPrice] = useState(0)
+  const [paymentMethod, setPaymentMethod] = useState<'card' | 'split'>('card')
+  const [bnpl, setBnpl] = useState<{ enabled: boolean; provider: string; parts: number; min_order: string } | null>(null)
 
   useEffect(() => { fetchCart() }, [])
 
   useEffect(() => {
     import('@/api').then(({ usersApi }) =>
-      usersApi.publicConfig().then((c) => setGiftWrapPrice(parseFloat(c.gift_wrap_price || '0'))).catch(() => {})
+      usersApi.publicConfig().then((c) => {
+        setGiftWrapPrice(parseFloat(c.gift_wrap_price || '0'))
+        setBnpl(c.bnpl || null)
+      }).catch(() => {})
     )
   }, [])
 
@@ -146,6 +151,7 @@ export default function CheckoutPage() {
         is_gift: isGift || giftWrap || !!giftMessage.trim() || undefined,
         gift_wrap: giftWrap || undefined,
         gift_message: giftMessage.trim() || undefined,
+        payment_method: paymentMethod,
       })
       message.success('Заказ создан!')
       if (order.payment?.confirmation_url) {
@@ -297,6 +303,22 @@ export default function CheckoutPage() {
                   value={referralToUse}
                   onChange={(v) => setReferralToUse(v || 0)}
                 />
+              </Form.Item>
+            )}
+
+            {bnpl?.enabled && total >= parseFloat(bnpl.min_order) && (
+              <Form.Item label="Способ оплаты">
+                <Radio.Group value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)}>
+                  <Radio value="card">Картой целиком</Radio>
+                  <Radio value="split">Частями ({bnpl.provider})</Radio>
+                </Radio.Group>
+                {paymentMethod === 'split' && (
+                  <Alert
+                    type="info" showIcon style={{ marginTop: 8 }}
+                    message={`${bnpl.parts} платежа по ~${Math.ceil(total / bnpl.parts).toLocaleString('ru')} ₽`}
+                    description="Первый платёж сегодня, остальные — каждые 2 недели. Без переплаты."
+                  />
+                )}
               </Form.Item>
             )}
 
