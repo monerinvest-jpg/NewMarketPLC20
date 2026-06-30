@@ -177,17 +177,17 @@ async def seed_demo():
 
         # ── Users: seller + buyer ────────────────────────────────────────────
         seller = User(
-            email="seller@demo.local", password_hash=get_password_hash("demo12345"),
+            email="seller@test.ru", password_hash=get_password_hash("12345678"),
             full_name="Демо Продавец", role=UserRole.seller, phone="+79990000001",
             is_active=True, email_verified=True, balance=Decimal("3043.00"),
         )
         buyer = User(
-            email="buyer@demo.local", password_hash=get_password_hash("demo12345"),
+            email="buyer@test.ru", password_hash=get_password_hash("12345678"),
             full_name="Демо Покупатель", role=UserRole.buyer, phone="+79990000002",
             is_active=True, email_verified=True, bonus_balance=Decimal("100.00"),
         )
         support_agent = User(
-            email="support@demo.local", password_hash=get_password_hash("demo12345"),
+            email="support@test.ru", password_hash=get_password_hash("12345678"),
             full_name="Демо Поддержка", role=UserRole.support, phone="+79990000003",
             is_active=True, is_staff=True, email_verified=True,
         )
@@ -199,7 +199,7 @@ async def seed_demo():
         # ── Shop + requisites + subscription ─────────────────────────────────
         shop = Shop(
             owner_id=seller.id, name="Демо-Маркет", description="Демонстрационный магазин.",
-            tagline="Лучшие демо-товары", contact_email="shop@demo.local",
+            tagline="Лучшие демо-товары", contact_email="shop@test.ru",
             contact_phone="+79990000001", status=ShopStatus.active, is_active=True,
         )
         db.add(shop)
