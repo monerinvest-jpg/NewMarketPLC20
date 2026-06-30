@@ -9,7 +9,7 @@
 
 ```
 infra/
-├── terraform/                 # Создание ресурсов YC (Вариант A, рабочий по умолчанию)
+├── terraform/                 # Создание ресурсов YC
 │   ├── providers.tf           #   провайдер yandex (ключ key.json), random, local
 │   ├── variables.tf           #   все переменные (обязательные: cloud_id/folder_id/service_account_id)
 │   ├── network.tf             #   VPC, подсети (a/b), NAT, security-группы kong/backend
@@ -17,28 +17,29 @@ infra/
 │   ├── compute.tf             #   бастион, instance-группы kong и backend, cloud-init
 │   ├── loadbalancer.tf        #   внешний NLB :80 → Kong :8000
 │   ├── target_group.tf        #   target-группа Kong
-│   ├── outputs.tf             #   выводы + ГЕНЕРАЦИЯ hosts.ini (Ansible-инвентарь)
+│   ├── storage.tf             #   Object Storage: приватный бакет + статический S3-ключ
+│   ├── mail.tf                #   Postbox: сервис-аккаунт-отправитель (SMTP-ключ)
+│   ├── outputs.tf             #   выводы + ГЕНЕРАЦИЯ hosts.ini (с S3_*/SMTP_* в [all:vars])
 │   ├── cloud-init.tpl         #   bootstrap узлов (docker, ssh-ключ)
 │   ├── ansible.cfg            #   inventory=./hosts.ini (Ansible запускается ОТСЮДА)
-│   ├── terraform.tfvars.example
-│   └── variant-b/             # ОПЦИЯ: по группе на сервис (для масштабирования)
+│   └── terraform.tfvars.example
 │
 └── ansible/
-    ├── deploy-services.yml    # Выкат: образы → migrate → 5 сервисов → worker/beat → Kong
+    ├── deploy-services.yml    # Backend: образы → migrate → 5 сервисов → worker/beat → Kong
+    ├── deploy-frontend.yml    # Frontend: контейнер handmade-frontend + Kong catch-all '/'
+    ├── observability.yml      # Опц.: Prometheus + Grafana + node_exporter
     ├── group_vars/all/
     │   └── vault.yml.example  #   шаблон секретов (реальный — ansible-vault, опционально)
     └── files/
         └── README.md          #   сюда положить root.crt (CA Managed PostgreSQL)
 ```
 
-## Два варианта развёртывания
+## Развёртывание
 
-- **Вариант A (по умолчанию):** базовый `terraform/` + `ansible/deploy-services.yml`.
-  Все 5 сервисов и worker/beat — контейнерами на существующей backend-группе
-  (порты 8001–8005). Kong — один маршрут на префикс пути. Ничего дополнительного
-  применять не нужно.
-- **Вариант B (масштабирование):** см. `terraform/variant-b/README.md` — отдельная
-  instance-группа на каждый сервис.
+Все 5 сервисов и worker/beat — контейнерами на общей backend-группе (порты 8001–8005),
+Kong — один маршрут на префикс пути. Фронтенд — отдельным образом/плейбуком
+(`deploy-frontend.yml`) за тем же Kong. Полная пошаговая инструкция — в
+[../DEPLOY.md](../DEPLOY.md).
 
 ## Что отличается от исходного инфра-репозитория
 
