@@ -1,225 +1,79 @@
-# Большой план: 20 пунктов + модерация магазина
+# Прогресс проекта
 
-## ВАЖНО О ПРОЦЕССЕ
-Пересобирать архив ПОСЛЕ КАЖДОГО блока! В начале хода `rm -rf marketplace`
-+ unzip перезаписывает рабочую папку из архива. Если архив не пересобран —
-работа теряется. (Один раз так потеряли Блок 1, пришлось воссоздавать.)
+Маркетплейс изделий ручной работы (Wildberries × Etsy). Микросервисы на общей
+PostgreSQL, фронт React+TS, инфра Yandex Cloud. Ниже — что реализовано.
 
-## Блоки
-
-### Блок 1 — Модерация магазина + фундамент моделей  [DONE, в архиве]
-- ShopStatus enum (pending/active/rejected/suspended) ✓
-- Shop.status + moderation_reason + business_hours ✓
-- POST /admin/shops/{id}/moderate (+ audit + notify + email) ✓
-- Фильтр /admin/shops?status= ✓
-- get_shop требует status==active ✓ (новый магазин → pending)
-- audit_service.py ✓
-- User.permissions (RBAC-задел) ✓
-- 9 таблиц: address, wishlist_collection, wishlist_item, product_view,
-  stock_movement, flash_sale, audit_log, feature_flag, chat_template ✓
-- Миграция 48↔48, FK, downgrade ✓
-- Фронтенд: AdminShops (фильтр+модерация+модалка), SellerShopSettings (баннер статуса) ✓
-
-### Блок 2 — Покупатель (1,2,4)  [DONE, в архиве]
-- Адресная книга: CRUD /addresses (single-default логика), AddressBookPage,
-  выбор сохранённого адреса в чекауте (заполняет delivery_address) ✓
-- Коллекции желаний: CRUD /wishlists + items, WishlistsPage,
-  кнопка "в коллекцию" на ProductPage (модалка выбора/создания) ✓
-- История просмотров: ProductView upsert в get_product (get_current_user_optional),
-  /recently-viewed, лента "Вы недавно смотрели" на HomePage ✓
-- buyer_extra.py роутер зарегистрирован, схемы добавлены ✓
-- Меню: "Мои коллекции", "Мои адреса" в дропдауне ✓
-
-### Блок 3 — Продавец: склад(7) + акции(9) + массовое(8)  [DONE, в архиве]
-- stock_service.py: record_movement (+ apply_to_stock flag), get_running_flash_sale, effective_price ✓
-- StockMovement: запись при заказе/отмене/возврате/ручном; /seller/stock/adjust, /movements, /low ✓
-- FlashSale: CRUD /seller/flash-sales, эффективная цена в ProductOut, отображение на ProductPage+каталоге ✓
-- Массовое: bulk-price, bulk-status, export-csv; rowSelection в SellerProducts ✓
-- SellerInventory.tsx, SellerFlashSales.tsx; меню Склад/Акции ✓
-- seller_inventory.py зарегистрирован
-
-### Блок 4 — Модерация (11,12,13)  [DONE, в архиве]
-- moderation_service.py: авто-флаги (стоп-слова, дубли, аномальные цены, пустое описание) + приоритет ✓
-- GET /admin/moderation/queue: pending-товары с флагами и приоритетом, сортировка ✓
-- GET /admin/audit-log: просмотр с фильтрами (entity_type, action), actor_email ✓
-- Аудит в moderate_product/bulk_moderate/process_payout/moderate_shop ✓
-- Уведомление продавца при модерации товара ✓
-- AdminModerationQueue.tsx (приоритеты/флаги/массовые), AdminAuditLog.tsx ✓
-- Меню: Очередь модерации, Журнал действий ✓
-
-### Блок 5 — Админ (14,15,16,17,18)  [DONE, в архиве]
-- analytics_service.py: cohort_retention, lifetime_value, conversion_funnel, financial_reconciliation ✓
-- rbac_service.py: ALL_PERMISSIONS, get/has_permission, serialize ✓
-- Эндпоинты: /analytics/{cohorts,ltv,funnel,reconciliation}, /audit-log/export,
-  /feature-flags CRUD, /permissions/catalog, /users/{id}/permissions ✓
-- AdminCohortAnalytics (retention heatmap+LTV+воронка), AdminReconciliation,
-  AdminFeatureFlags, экспорт аудит-лога, права в AdminModerators ✓
-- Меню: Когорты и LTV, Реконсиляция, Feature flags ✓
-
-### Блок 6 — Инфраструктура (3,5,6,10,19,20)  [DONE, в архиве]
-- (3) Стэкинг бонусов+промокодов: cap на subtotal, защита от over-discount ✓
-- (6) storage_service: локально или S3/MinIO, валидация типа/размера; /upload эндпоинт ✓
-- (10) ChatTemplate CRUD /seller/chat-templates + /seller/business-hours; SellerChatTemplates.tsx ✓
-- (19) pytest: tests/test_business_logic.py (комиссии, цены, slug, RBAC, приоритеты, скидки) ✓
-- (20) search_service: MeiliSearch + ILIKE-фоллбэк; /products/search ✓
-- (5) web-push: задел (in-app+email готовы; VAPID/SW не реализованы) — в README
-- config: S3_*, MEILI_* опциональные настройки ✓
-- ВСЕ 6 БЛОКОВ ЗАВЕРШЕНЫ
-
-### Новый запрос · Блок 2 — Фискализация чеков (54-ФЗ)  [DONE, в архиве]
-- Способ: встроенная фискализация ЮKassa (receipt в платеже/возврате; ОФД-регистрация на их стороне)
-- models: FiscalReceipt + enums; SellerRequisites.vat_code/tax_system_code; миграция в 0001_initial ✓
-- fiscal_service: build_receipt (НДС/предмет/способ расчёта, доставка=service, СНО, агентская схема),
-  apply_registration (из вебхука), create_pending_receipt, retry-helpers ✓
-- payment_service: receipt= в create_payment/refund_payment + create_standalone_receipt (/receipts) ✓
-- orders.py: чек прихода при оплате, статус из receipt_registration в вебхуке, возврат прихода при отмене ✓
-- return_service: чек возврата прихода при RMA ✓
-- Эндпоинты: /orders/{id}/receipts; /admin/fiscal/receipts (list+counts), /{id}, /{id}/retry ✓
-- Frontend: AdminFiscalReceipts.tsx + меню; OrderDetailPage блок чеков; RequisitesFields НДС/СНО ✓
-- ВАЖНО: backend без зависимостей в окружении — проверено только py_compile; фронт без node_modules (typecheck не гонялся)
-
-### Новый запрос · Блок 3 — Верифицированные отзывы + рейтинг продавца  [DONE, в архиве]
-- Review.is_verified_purchase + order_id; Shop.reviews_count; в миграции 0001_initial ✓
-- rating_service.py: recalculate_product_rating / recalculate_shop_rating / recalculate_for_product
-  / shop_rating_summary (среднее, count, verified_count, распределение 1–5) ✓
-- reviews.py: verified-флаг и order_id при создании; verified_only-фильтр; /reviews/shop/{id}/summary;
-  общий пересчёт вместо локального ✓
-- admin.py: модерация/удаление отзыва пересчитывают рейтинг товара И магазина ✓
-- schemas: ReviewOut.is_verified_purchase, ShopOut.reviews_count, ShopRatingSummary ✓
-- Frontend: бейдж + чекбокс «только проверенные» (ProductPage); карточка рейтинга продавца
-  с распределением и verified-счётчиком (ShopPage) ✓
-- Проверка: py_compile (без зависимостей в окружении); фронт без node_modules — typecheck не гонялся
-
-### Новый запрос · Блок 4 — Рекомендации «с этим покупают»  [DONE, в архиве]
-- ProductCoPurchase (материализованные направленные пары + score); в миграции 0001_initial ✓
-- recommendation_service: rebuild_co_purchase (статусы paid+), get_product_recommendations,
-  recommended_for_user, cart_recommendations ✓
-- Эндпоинты: /products/{id}/recommendations (через сервис), /recommendations/for-me,
-  /recommendations/cart; admin /admin/recommendations/rebuild ✓
-- Celery: rebuild_recommendations + ночной beat (4:00) ✓
-- Frontend: RecommendationRow; «Рекомендуем вам» (главная), «Часто покупают вместе» (корзина) ✓
-- Тест: PURCHASED_STATUSES gating ✓
-- Проверка: py_compile (без зависимостей в окружении); фронт без node_modules — typecheck не гонялся
-- ИТОГ: все 4 блока нового запроса (этикетки/фискализация/отзывы+рейтинг/рекомендации) завершены
-
-### Сидинг демо-данных  [DONE, в архиве]
-- scripts/seed.py: к справочным данным (админ/категории/тарифы/атрибуты/валюты/настройки)
-  добавлен seed_demo() — связная мини-история по строке на КАЖДУЮ оставшуюся таблицу (53 модели)
-- Сценарий: продавец+магазин+реквизиты+подписка → 2 товара (картинки/вариант/атрибут/флэш-распродажа/
-  движение склада/вопрос) → покупатель (корзина/избранное/просмотр/подписка на цену) → завершённый
-  заказ из 2 позиций (суб-заказ/оплата succeeded/фискальный чек/доставка/транзакции) →
-  верифицированный отзыв (+ответ/голос/фото) → возврат → купоны → чат+шаблон → выплата → баннер →
-  адрес → вишлист → реферал+награда → жалоба → аудит → feature flag → коды/смс/reset-токен
-- Рейтинги и co-purchase пересчитываются в конце через rating_service / recommendation_service
-- Идемпотентно (guard по seller@demo.local). Логины демо: seller@demo.local / buyer@demo.local, пароль demo12345
-- Запускается автоматически в docker-compose: alembic upgrade head && python scripts/seed.py
-
-### Новый запрос · Блок A — Поддержка пользователей  [DONE, в архиве]
-- Роль support + RBAC (users.view/support.handle/support.manage + дефолты ролей); в миграции ✓
-- SupportTicket + SupportMessage; dep get_current_support_staff ✓
-- /support: пользовательские и стафф-эндпоинты + статистика + read-only карточка клиента ✓
-- Frontend: SupportPage, SupportDesk, роуты, меню, AdminModerators (мод+поддержка), роль в AdminUsers ✓
-- Seed: support@demo.local + демо-тикет ✓
-- Проверка: py_compile (без зависимостей); фронт без node_modules — typecheck не гонялся
-- Следующий: Блок B — платное продвижение с аукционом
-
-### Новый запрос · Блок B — Платное продвижение (аукцион)  [DONE, в архиве]
-- PaidFeature (каталог: цена/период/слоты/тумблер) + Promotion (ставка/покупка); в миграции ✓
-- promotion_service: дефолтный каталог, списание с баланса, place_promotion (фикс/аукцион),
-  settle_auction/settle_all (ранжирование+суточное списание+демоут), homepage winners, standing ✓
-- Эндпоинты: seller / admin (paid-features+settle) / public (homepage) ✓
-- Celery: settle_promotions + ночной beat ✓
-- Frontend: SellerPromotion, AdminPaidFeatures, ряд «Реклама» на главной, меню ✓
-- Seed: каталог фич + активное демо-продвижение ✓
-- Проверка: py_compile (без зависимостей); фронт без node_modules — typecheck не гонялся
-- ИТОГ: поддержка + продвижение — оба блока готовы
-
-### Доработки  [DONE, в архиве]
-- Рекламный кошелёк (Shop.ad_balance + AdWalletTransaction + пакеты пополнения); списание промо с него ✓
-- Уведомление продавцу при перебитой ставке (settle_auction) ✓
-- SLA поддержки: escalation_level + is_overdue + sla_sweep (эскалация+авто-назначение) + Celery + ручной запуск;
-  overdue в статах, фильтр и бейдж в SupportDesk ✓
-- Проверка: py_compile (без зависимостей); фронт без node_modules — typecheck не гонялся
-
-### Большой запрос · Блок 1 — Подписка на магазины + лента  [DONE, в архиве]
-- ShopFollow + NotificationType.shop_update (в миграции); shop_follow_service ✓
-- Уведомления подписчикам при новом товаре и флэш-распродаже ✓
-- Эндпоинты follow/unfollow/status/following/feed ✓
-- Frontend: кнопка подписки на ShopPage, страница «Мои подписки», меню ✓
-- Seed: демо-подписка ✓
-- Проверка: py_compile; фронт без node_modules — typecheck не гонялся
-- Дальше: Блок 2 — расширенные акции
-
-### Большой запрос · Блок 2 — Расширенные акции  [DONE, в архиве]
-- PromoRule (nplus/volume) + Bundle/BundleItem; promo_rules_service (правила+наборы) ✓
-- Эндпоинты seller CRUD + public bundles/promos + /cart/summary; интеграция в заказ ✓
-- Frontend: SellerPromoRules, авто-скидка в корзине, наборы на странице товара ✓
-- Seed: объёмная скидка + набор ✓
-- Проверка: py_compile; фронт без node_modules — typecheck не гонялся
-- Дальше: Блок 3 — аналитика рекламы продавца (ROI)
-
-### Большой запрос · Блок 3 — Аналитика рекламы (ROI)  [DONE, в архиве]
-- Promotion.impressions/clicks; record_event; seller_analytics (CTR/CPC/ROI + атрибуция выручки) ✓
-- /promotions/homepage с promotion_id, POST /event, GET /seller/promotions/analytics ✓
-- Frontend: трекинг показов/кликов на главной, раздел ROI в SellerPromotion ✓
-- Проверка: py_compile; фронт без node_modules — typecheck не гонялся
-- Дальше: Блок 4 — арбитраж споров
-
-### Большой запрос · Блок 4 — Арбитраж споров  [DONE, в архиве]
-- Dispute + DisputeMessage; dispute_service (open/escalate/resolve + рефанд) ✓
-- Эндпоинты покупатель/продавец(concede)/медиатор(resolve); доступ через role_in_dispute ✓
-- Frontend: DisputeThread + DisputesPage + SellerDisputes + DisputeDesk; роуты/меню ✓
-- Seed: демо-спор ✓
-- Проверка: py_compile; фронт без node_modules — typecheck не гонялся
-- Дальше: Блок 5 — подарочные сертификаты + промо-баланс
-
-### Большой запрос · Блок 5 — Подарочные сертификаты + промо-баланс  [DONE, в архиве]
-- promo_balance/promo_used; GiftCertificate + PromoBalanceTransaction; gift_service ✓
-- Авто-списание промо-баланса на чекауте; эндпоинты покупатель/админ ✓
-- Frontend: GiftCertificatesPage, AdminGiftCertificates; меню ✓
-- Seed: промо-баланс + сертификаты ✓
-- Проверка: py_compile; фронт без node_modules — typecheck не гонялся
-- Дальше: Блок 6 — программа лояльности с уровнями
-
-### Большой запрос · Блок 6 — Программа лояльности с уровнями  [DONE, в архиве]
-- LoyaltyTier (настраивается в админке) + поля лояльности у User; loyalty_tier_service ✓
-- Кэшбэк по уровню, бесплатная доставка-перк, распад по неактивности (Celery), прогресс/обратный отсчёт ✓
-- Эндпоинты /loyalty/* + /admin/loyalty-tiers CRUD; Frontend LoyaltyPage + AdminLoyaltyTiers ✓
-- Seed: уровни + «Серебро» ✓
-- Проверка: py_compile; фронт без node_modules — typecheck не гонялся
-- Дальше: Блок 7 — KYC и бейджи доверия продавца
-
-### Хотфикс фронтенда (после Блока 6)
-- Причина падения дев-сервера/ошибок TS: DisputesPage.tsx экспортировал и компонент, и значение `disputeStatusMeta`,
-  которое импортировали SellerDisputes и DisputeDesk (импорт значения страница→страница). Это нарушает React Fast Refresh
-  (@vitejs/plugin-react: файл с компонентом должен экспортировать только компоненты) и сбивает TS-сервер → каскад «Cannot find module '@/...'».
-- Фикс: вынес disputeStatusMeta в src/lib/disputeMeta.ts; DisputesPage/SellerDisputes/DisputeDesk импортируют оттуда.
-- Прочее: меж-страничных импортов значений больше нет (проверено); конфиги @-алиаса (vite+tsconfig) корректны; VITE_API_URL опционален (есть прокси).
-- Блок 7 (KYC) был начат и откачен до чистого состояния — доделаю отдельным блоком.
+**Текущая схема БД:** миграции `0001 → 0015` (линейная цепочка, один head
+`0015_custom_orders`). **Тесты:** `pytest` зелёный (бизнес-логика). **Сборка:**
+backend импортируется во всех 5 сервисах, frontend `vite build` проходит.
 
 ---
 
-## Рефакторинг под Yandex Cloud (PostgreSQL + микросервисы)
+## Этап 0 — Ядро маркетплейса [DONE]
+- Аутентификация: регистрация, подтверждение email кодом, сброс пароля, 2FA (TOTP + backup-коды), верификация телефона (SMSC.ru), роли buyer/seller/support/moderator/superadmin, гранулярный RBAC.
+- Каталог: товары, варианты, атрибуты, дерево категорий, вопросы-ответы; отзывы (премодерация, фото, голоса, ответы); избранное, коллекции, сравнение, недавно просмотренные, рекомендации «с этим покупают».
+- Заказы: корзина, мультимагазинные заказы (покомпонентная комиссия/выплаты), статусы, суб-заказы, возвраты, адреса.
+- Оплата YooKassa + 54-ФЗ фискализация; доставка (СДЭК + абстракция); продвижение (аукцион платных мест); подписки на товар.
+- Продавец: магазин, товары, заказы, аналитика, купоны, выводы (реквизиты/налоговые режимы), тарифы/подписки, склад, CSV-импорт, флеш-сейлы, шаблоны чата.
+- Поддержка: тикеты (SLA, авто-назначение, эскалация), чат покупатель↔продавец, **арбитраж споров**.
+- Лояльность: подарочные сертификаты + промо-баланс, уровни лояльности (кэшбэк, перки, распад).
+- Платформа: уведомления (in-app/email/push), мультивалютность, аудит-лог, feature flags, rate limiting, базовая админ-панель.
 
-### Этап 1 — PostgreSQL + адаптация под инфру  [DONE]
-- Драйвер asyncmy → asyncpg; MySQL → Managed PostgreSQL 17 (порт-пулер 6432).
-- config.py: MYSQL_* → DB_*; принимает готовый DATABASE_URL от Ansible; JWT_ALGORITHM-алиас;
-  REFRESH_SECRET_KEY; Celery из REDIS_URL; DB_SSL/DB_SSL_ROOT_CERT (TLS Managed PG).
-- security.py: refresh-токены отдельным секретом. database.py/alembic: TLS connect_args.
-- Dockerfile: убраны MySQL-библиотеки; entrypoint.sh диспетчер migrate/web/worker/beat/seed.
-- models.py: enum'ы native_enum=False (VARCHAR+CHECK) — портируемость, нет дублей CREATE TYPE.
-- 0001_initial: миграция из Base.metadata (была MySQL-DDL). docker-compose/.env → Postgres.
+## Этап A/B/C — Цифровые товары и обучение [DONE]
+- A: цифровые товары мгновенной выдачи (DigitalAsset, entitlements, приватное хранилище), управление деревом категорий.
+- B: встроенная LMS (курсы/модули/уроки), защита контента (вотермарк, запрет скачивания, no-select).
+- C: тесты (серверная проверка), сертификаты (PDF, кириллица, проверка по коду), видео в **HLS + AES-128** (ffmpeg, Celery), кастомизация сертификата + ФИО получателя.
 
-### Этап 2 — разбиение монолита на сервисы (общая БД)  [DONE — код]
-- backend/ → shared/ (пакет `app` остаётся как shared-библиотека, импорты не менялись).
-- Удалена монолитная точка входа app/main.py + единый Dockerfile.
-- shared/app/service_factory.py — фабрика FastAPI (CORS/limiter/uploads/health).
-- 5 сервисов (services/{identity,catalog,orders,sellers,platform}/main.py + Dockerfile) +
-  worker. Все 38 роутеров распределены по сервисам ровно по разу.
-- 3 роутера переназначены ради чистоты префиксов: disputes.seller→sellers,
-  promotions.admin→platform, promo.public→catalog; точечный маршрут /seller/sub-orders→orders.
-- gateway/nginx.conf — локальный gateway (зеркало Kong). docker-compose: gateway + 5 сервисов +
-  worker/beat + migrate-job + Postgres/Redis.
-- infra/STAGE2_INFRA_CHANGES.md — патч для Terraform/Ansible-репозитория (образы, порты,
-  таблица маршрутов Kong). Сам инфра-репозиторий правится отдельно.
-- Проверено: py_compile всех изменённых файлов проходит. Импорт-проверка/прогон — в облаке (нет лок. теста).
+## Реферальная программа 2.0 [DONE · миграция 0007]
+- Пожизненные начисления: процент со ВСЕХ покупок приглашённых покупателей и продаж приглашённых продавцов (идемпотентно по заказу).
+- Отдельный выводимой `referral_balance`; вывод на счёт по налоговому статусу (самозанятый/ИП/ООО) — `WithdrawalAccount`, `PayoutRequest.source`.
+- Оплата реферальным балансом **до 100%** заказа (с путём «бесплатного» заказа).
+
+## Инфраструктура и платформа [DONE]
+- **CI/CD** (GitHub Actions): `ci.yml` (compileall + pytest + vite build), `deploy.yml` (сборка/пуш 6 backend + frontend образов в YC CR + опц. Ansible-деплой).
+- **Object Storage (S3)**: `storage.tf` (приватный бакет + статический ключ); картинки — public-read, цифровые товары/HLS — приватно (presigned). Env через Ansible-inventory.
+- **Postbox (SMTP)**: `mail.tf`; письма неблокирующие (asyncio.to_thread), HTML, never-raises.
+- **Блок 5 — кэш + изображения + наблюдаемость:** Redis-кэш (`@cached`, инвалидация; дерево категорий), оптимизация загрузок в WebP (Pillow), Sentry + Prometheus `/metrics` на каждом сервисе.
+- **Блок 7 — Grafana:** `observability.yml` (Prometheus + Grafana + node_exporter), Kong Prometheus-плагин; раздел «Метрики» в админке (iframe Grafana, URL в настройках).
+- **Развязка фронтенда:** отдельный образ/контейнер за Kong, относительный `/api/v1` (нет хоста бэка, нет CORS), `deploy-frontend.yml` — независимый деплой.
+
+## Админ-панель 2.0 [DONE]
+- 360°-карточки пользователей и магазинов; **полное редактирование** пользователей (email/имя/телефон/роль/флаги/пароль), магазинов (все поля + модерация), заказов (статусы вкл. отмену через полный реверс, адрес, трек).
+- Управление ролями и **правами↔пунктам меню** (меню фильтруется по правам), корректировка любых балансов (с леджером и аудитом).
+- Аналитика платформы + **финансовый блок** (прибыль, реф-расходы, выплаты, обязательства), когорты/LTV, реконсиляция, фискальные чеки.
+- Выплаты с **анти-фрод сигналами** и переходом в профиль; навигация сгруппирована в 6 разделов; крафт/дерево-дизайн, адаптивность, фикс «сдвига влево».
+
+## Блок 3 — Сотрудники магазина [DONE · миграция 0008]
+- `ShopMember` (роли owner/manager/staff + JSON-права), приглашение по email, права↔разделы кабинета; допуск сотрудников в кабинет.
+
+## Блок 1 — KYC и бейджи доверия [DONE · миграция 0009]
+- Верификация документов (`SellerVerification`, приватный S3), очередь в админке; бейджи **Проверенный** (после KYC) и **VIP** (платно или за репутацию). Пороги/цена — в настройках.
+
+## Блок 4 — Мультидоставка [DONE]
+- 4 службы (СДЭК/Ozon/Яндекс/Почта) + `/delivery/quote-all` (сравнение тарифов); админ-включение служб (`delivery_enabled_services`).
+
+## Блок 2 — Email/Push-кампании [DONE · миграция 0010]
+- `Campaign` + сегменты (роль/активность/верификация/реф-баланс), Celery-рассылка батчами (Postbox/уведомления), one-click отписка (HMAC), админ-страница «Рассылки».
+
+## Блок 6 — Мультиязычность [DONE — каркас]
+- react-i18next (ru/en), переключатель в шапке, синхрон с antd locale; переводы наращиваются по страницам.
+
+## Фаза 2 (по анализу конкурентов) — пункты 1–5 [DONE]
+- **Богаче отзывы** (0011): видео-отзывы (`review_photo.media_type`), реальная загрузка фото/видео, галерея медиа в карточке.
+- **Подарки** (0012): подарочная упаковка (платно) + открытка в заказе; письмо получателю подарочного сертификата.
+- **BNPL / оплата частями** (0013): `InstallmentPlan`, `PaymentGateway.split`, провайдер платит площадке сразу, график на чекауте и в заказе; настройки в админке.
+- **Seller Academy** (0014): бесплатные курсы площадки для продавцов (паттерн LMS), admin CRUD + кабинет продавца + прогресс.
+- **Кастом-заказы** (0015): `CustomRequest`/`CustomMessage` — запрос→переписка→оферта (цена/срок/предоплата)→принятие→статусы производства→завершение; кнопка «Заказать своё», страницы у покупателя и продавца.
+
+---
+
+## Отложено (Фаза 2, пункты 6–14)
+6. AI-слой (чат-бот, авто-описания, семантический/визуальный поиск, перс. лента)
+7. Рекламный кабинет продавца + прогноз спроса + A/B листингов
+8. Live-шопинг / короткие видео (reels)
+9. Подписка Prime-типа (на базе уровней лояльности)
+10. «Защита покупателя» / escrow-бейдж
+11. Фулфилмент-лайт (склад/консолидированная отгрузка)
+12. Мобильные приложения / PWA
+13. B2B-режим (прайс-листы, счета, опт)
+14. Кросс-бордер (полный перевод контента + таможня/мультивалютные расчёты)
