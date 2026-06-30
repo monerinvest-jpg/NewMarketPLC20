@@ -590,6 +590,7 @@ class ReviewCreate(BaseModel):
     rating: int = Field(ge=1, le=5)
     text: Optional[str] = None
     photos: list[str] = Field(default_factory=list)
+    videos: list[str] = Field(default_factory=list)
 
 
 class ReviewModerationUpdate(BaseModel):
@@ -928,6 +929,7 @@ class ProductQuestionOut(OrmBase):
 class ReviewPhotoOut(OrmBase):
     id: int
     url: str
+    media_type: str = "image"
     sort_order: int
 
 

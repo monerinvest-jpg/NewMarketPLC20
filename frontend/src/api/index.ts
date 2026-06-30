@@ -296,8 +296,15 @@ export const reviewsApi = {
   shopSummary: (shop_id: number) =>
     api.get<ShopRatingSummary>(`/reviews/shop/${shop_id}/summary`).then(r => r.data),
 
-  create: (product_id: number, data: { rating: number; text?: string; photos?: string[] }) =>
+  create: (product_id: number, data: { rating: number; text?: string; photos?: string[]; videos?: string[] }) =>
     api.post<Review>(`/reviews/product/${product_id}`, data).then(r => r.data),
+
+  uploadMedia: (file: File) => {
+    const fd = new FormData(); fd.append('file', file)
+    return api.post<{ url: string; media_type: string }>('/reviews/upload-media', fd).then(r => r.data)
+  },
+  productMedia: (product_id: number) =>
+    api.get<Array<{ id: number; url: string; media_type: string }>>(`/reviews/product/${product_id}/media`).then(r => r.data),
 
   myReviews: () => api.get<Review[]>('/reviews/my').then(r => r.data),
 

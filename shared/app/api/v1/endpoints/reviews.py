@@ -1,7 +1,7 @@
 """
 Reviews endpoints: creation with moderation gating, seller replies, helpful votes.
 """
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -129,10 +129,13 @@ async def create_review(
     db.add(review)
     await db.flush()
 
-    # Attach photos
+    # Attach media — photos first, then short videos (capped).
     from app.models.models import ReviewPhoto
-    for i, url in enumerate(payload.photos[:8]):
-        db.add(ReviewPhoto(review_id=review.id, url=url, sort_order=i))
+    idx = 0
+    for url in payload.photos[:8]:
+        db.add(ReviewPhoto(review_id=review.id, url=url, media_type="image", sort_order=idx)); idx += 1
+    for url in payload.videos[:3]:
+        db.add(ReviewPhoto(review_id=review.id, url=url, media_type="video", sort_order=idx)); idx += 1
 
     if initial_status == ReviewStatus.approved:
         await rating_service.recalculate_for_product(db, product_id)
@@ -141,6 +144,40 @@ async def create_review(
     await db.refresh(review)
     await db.refresh(review, ["user", "reply", "votes", "photos"])
     return _to_review_out(review, current_user.id)
+
+
+@router.post("/upload-media")
+async def upload_review_media(
+    file: UploadFile = File(...),
+    _: User = Depends(get_current_user),
+):
+    """Upload a review photo or short video. Returns {url, media_type}."""
+    from app.services.storage_service import save_public_media
+    content = await file.read()
+    try:
+        url, media_type = await save_public_media(content, file.content_type or "", file.filename or "media")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"url": url, "media_type": media_type}
+
+
+@router.get("/product/{product_id}/media")
+async def product_review_media(
+    product_id: int,
+    db: AsyncSession = Depends(get_db),
+    limit: int = Query(24, ge=1, le=60),
+):
+    """Aggregated customer photos+videos for a product (approved reviews only) —
+    powers the 'Фото и видео покупателей' gallery on the product page."""
+    from app.models.models import ReviewPhoto
+    rows = (await db.execute(
+        select(ReviewPhoto)
+        .join(Review, Review.id == ReviewPhoto.review_id)
+        .where(Review.product_id == product_id, Review.status == ReviewStatus.approved)
+        .order_by(ReviewPhoto.media_type.desc(), ReviewPhoto.id.desc())
+        .limit(limit)
+    )).scalars().all()
+    return [{"id": m.id, "url": m.url, "media_type": m.media_type} for m in rows]
 
 
 @router.get("/my", response_model=list[ReviewOut])

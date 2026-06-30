@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import {
   Row, Col, Image, Button, Rate, Typography, Tabs, InputNumber,
-  Spin, message, Form, Input, List, Avatar, Empty, Card, Radio, Modal, Tag, Checkbox
+  Spin, message, Form, Input, List, Avatar, Empty, Card, Radio, Modal, Tag, Checkbox, Upload
 } from 'antd'
 import {
   ShoppingCartOutlined, HeartOutlined, HeartFilled, LikeOutlined,
@@ -43,6 +43,9 @@ export default function ProductPage() {
   const [reviewLoading, setReviewLoading] = useState(false)
   const [selectedImage, setSelectedImage] = useState<string>('')
   const [reviewPhotos, setReviewPhotos] = useState<string[]>([])
+  const [reviewVideos, setReviewVideos] = useState<string[]>([])
+  const [uploadingMedia, setUploadingMedia] = useState(false)
+  const [customerMedia, setCustomerMedia] = useState<Array<{ id: number; url: string; media_type: string }>>([])
   const [questionText, setQuestionText] = useState('')
   const [wishlistModalOpen, setWishlistModalOpen] = useState(false)
   const [wishlistCollections, setWishlistCollections] = useState<{ id: number; name: string; item_count: number }[]>([])
@@ -72,6 +75,7 @@ export default function ProductPage() {
       if (v.length > 0) setSelectedVariant(v[0].id)
       setQuestions(q)
       setRecommendations(recs)
+      reviewsApi.productMedia(pid).then(setCustomerMedia).catch(() => {})
       promoRulesApi.productBundles(pid).then(setBundles).catch(() => {})
       const img = p.images.find((i) => i.is_main) || p.images[0]
       setSelectedImage(img?.url || '')
@@ -157,10 +161,24 @@ export default function ProductPage() {
     }
   }
 
+  const handleReviewMedia = async (file: File) => {
+    setUploadingMedia(true)
+    try {
+      const r = await reviewsApi.uploadMedia(file)
+      if (r.media_type === 'video') setReviewVideos((v) => [...v, r.url])
+      else setReviewPhotos((p) => [...p, r.url])
+    } catch (e: any) {
+      message.error(e.response?.data?.detail || 'Не удалось загрузить файл')
+    } finally {
+      setUploadingMedia(false)
+    }
+    return false // prevent antd Upload auto-upload
+  }
+
   const handleReview = async (values: { rating: number; text: string }) => {
     setReviewLoading(true)
     try {
-      const review = await reviewsApi.create(parseInt(id!), { ...values, photos: reviewPhotos })
+      const review = await reviewsApi.create(parseInt(id!), { ...values, photos: reviewPhotos, videos: reviewVideos })
       if (review.status === 'approved') {
         setReviews([review, ...reviews])
         message.success('Отзыв опубликован')
@@ -168,7 +186,7 @@ export default function ProductPage() {
         message.success('Отзыв отправлен на модерацию и появится после проверки')
       }
       form.resetFields()
-      setReviewPhotos([])
+      setReviewPhotos([]); setReviewVideos([])
     } catch (e: any) {
       message.error(e.response?.data?.detail || 'Ошибка')
     } finally {
@@ -409,27 +427,43 @@ export default function ProductPage() {
                         <Form.Item name="text" label="Отзыв">
                           <Input.TextArea rows={3} placeholder="Поделитесь впечатлениями" />
                         </Form.Item>
-                        <Form.Item label="Фото (URL, по одному)">
-                          <Input.Search
-                            placeholder="Вставьте URL фото и нажмите +"
-                            enterButton={<PlusOutlined />}
-                            onSearch={(v) => { if (v) setReviewPhotos([...reviewPhotos, v]) }}
-                          />
-                          <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                        <Form.Item label="Фото и видео">
+                          <Upload accept="image/*,video/*" multiple showUploadList={false} beforeUpload={handleReviewMedia}>
+                            <Button icon={<PlusOutlined />} loading={uploadingMedia}>Добавить фото / видео</Button>
+                          </Upload>
+                          <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
                             {reviewPhotos.map((url, i) => (
-                              <div key={i} style={{ position: 'relative' }}>
+                              <div key={`p${i}`} style={{ position: 'relative' }}>
                                 <img src={url} alt="" style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 6 }} />
-                                <Button
-                                  size="small" danger type="text"
-                                  style={{ position: 'absolute', top: -8, right: -8 }}
-                                  onClick={() => setReviewPhotos(reviewPhotos.filter((_, idx) => idx !== i))}
-                                >×</Button>
+                                <Button size="small" danger type="text" style={{ position: 'absolute', top: -8, right: -8 }}
+                                  onClick={() => setReviewPhotos(reviewPhotos.filter((_, idx) => idx !== i))}>×</Button>
+                              </div>
+                            ))}
+                            {reviewVideos.map((url, i) => (
+                              <div key={`v${i}`} style={{ position: 'relative' }}>
+                                <video src={url} style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 6, background: '#000' }} />
+                                <Button size="small" danger type="text" style={{ position: 'absolute', top: -8, right: -8 }}
+                                  onClick={() => setReviewVideos(reviewVideos.filter((_, idx) => idx !== i))}>×</Button>
                               </div>
                             ))}
                           </div>
                         </Form.Item>
                         <Button type="primary" htmlType="submit" loading={reviewLoading}>Отправить</Button>
                       </Form>
+                    </Card>
+                  )}
+
+                  {customerMedia.length > 0 && (
+                    <Card size="small" title="Фото и видео покупателей" style={{ marginBottom: 16 }}>
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                        {customerMedia.map((m) => (
+                          m.media_type === 'video' ? (
+                            <video key={m.id} src={m.url} controls style={{ width: 120, height: 90, objectFit: 'cover', borderRadius: 8, background: '#000' }} />
+                          ) : (
+                            <Image key={m.id} src={m.url} width={90} height={90} style={{ objectFit: 'cover', borderRadius: 8 }} />
+                          )
+                        ))}
+                      </div>
                     </Card>
                   )}
 
@@ -468,9 +502,13 @@ export default function ProductPage() {
                             description={r.text}
                           />
                           {r.photos && r.photos.length > 0 && (
-                            <div style={{ display: 'flex', gap: 8, marginTop: 8, marginLeft: 48 }}>
+                            <div style={{ display: 'flex', gap: 8, marginTop: 8, marginLeft: 48, flexWrap: 'wrap' }}>
                               {r.photos.map((ph) => (
-                                <Image key={ph.id} src={ph.url} width={72} height={72} style={{ objectFit: 'cover', borderRadius: 6 }} />
+                                ph.media_type === 'video' ? (
+                                  <video key={ph.id} src={ph.url} controls style={{ width: 110, height: 72, objectFit: 'cover', borderRadius: 6, background: '#000' }} />
+                                ) : (
+                                  <Image key={ph.id} src={ph.url} width={72} height={72} style={{ objectFit: 'cover', borderRadius: 6 }} />
+                                )
                               ))}
                             </div>
                           )}

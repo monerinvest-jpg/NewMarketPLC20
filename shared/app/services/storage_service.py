@@ -52,6 +52,30 @@ async def save_file(content: bytes, content_type: str, original_name: str) -> st
     return _save_local(content, filename)
 
 
+ALLOWED_VIDEO_TYPES = {"video/mp4", "video/webm", "video/quicktime"}
+MAX_VIDEO_SIZE = 50 * 1024 * 1024  # 50 MB — short review clips
+
+
+async def save_public_media(content: bytes, content_type: str, original_name: str) -> tuple[str, str]:
+    """
+    Persist a PUBLIC image or short video (e.g. a customer review photo/video).
+    Images are optimised to WebP; videos are stored as-is. Returns (url, media_type)
+    where media_type is 'image' | 'video'. Raises ValueError on validation failure.
+    """
+    ctype = (content_type or "").lower()
+    if ctype in ALLOWED_VIDEO_TYPES:
+        if len(content) > MAX_VIDEO_SIZE:
+            raise ValueError(f"Видео слишком большое (максимум {MAX_VIDEO_SIZE // (1024 * 1024)} МБ).")
+        ext = {"video/mp4": ".mp4", "video/webm": ".webm", "video/quicktime": ".mov"}.get(ctype, ".mp4")
+        filename = f"{uuid.uuid4().hex}{ext}"
+        if _s3_configured():
+            return await _save_s3(content, ctype, filename), "video"
+        return _save_local(content, filename), "video"
+    # Fall back to the image path (validates + optimises to WebP).
+    url = await save_file(content, content_type, original_name)
+    return url, "image"
+
+
 def _save_local(content: bytes, filename: str) -> str:
     os.makedirs(LOCAL_UPLOAD_DIR, exist_ok=True)
     path = os.path.join(LOCAL_UPLOAD_DIR, filename)

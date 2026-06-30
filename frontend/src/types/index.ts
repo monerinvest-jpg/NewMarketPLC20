@@ -477,6 +477,7 @@ export interface ProductQuestion {
 export interface ReviewPhoto {
   id: number
   url: string
+  media_type?: string
   sort_order: number
 }
 

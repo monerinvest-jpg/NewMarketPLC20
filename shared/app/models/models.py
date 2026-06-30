@@ -1336,12 +1336,13 @@ class ProductQuestion(Base):
 
 
 class ReviewPhoto(Base):
-    """A photo attached to a product review."""
+    """A photo OR video attached to a product review (media_type discriminates)."""
     __tablename__ = "review_photo"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     review_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("review.id"), nullable=False)
     url: Mapped[str] = mapped_column(String(512), nullable=False)
+    media_type: Mapped[str] = mapped_column(String(10), default="image", nullable=False, server_default="image")  # image | video
     sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
     review: Mapped["Review"] = relationship("Review", back_populates="photos")
