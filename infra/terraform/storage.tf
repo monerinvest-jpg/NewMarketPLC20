@@ -24,6 +24,9 @@ locals {
   # Sanitize project/env into a valid S3 name: lowercase, only [a-z0-9-].
   _bucket_base = replace(lower("${var.project_name}-${var.environment}-assets"), "/[^a-z0-9-]/", "-")
   bucket_name  = var.s3_bucket_name != "" ? var.s3_bucket_name : "${local._bucket_base}-${random_string.bucket_suffix.result}"
+  # Separate PRIVATE bucket (digital goods / HLS / KYC) — never public.
+  _private_base       = replace(lower("${var.project_name}-${var.environment}-private"), "/[^a-z0-9-]/", "-")
+  private_bucket_name = "${local._private_base}-${random_string.bucket_suffix.result}"
 }
 
 resource "yandex_iam_service_account" "storage" {
@@ -66,8 +69,33 @@ resource "yandex_storage_bucket" "assets" {
   }
 }
 
+# PRIVATE bucket: digital goods, encrypted HLS, KYC documents. Never public —
+# served only via short-lived presigned URLs / the gated proxy. Same storage SA.
+resource "yandex_storage_bucket" "private" {
+  access_key = yandex_iam_service_account_static_access_key.storage_key.access_key
+  secret_key = yandex_iam_service_account_static_access_key.storage_key.secret_key
+  bucket     = local.private_bucket_name
+
+  depends_on = [yandex_resourcemanager_folder_iam_member.storage_editor]
+
+  anonymous_access_flags {
+    read = false
+    list = false
+  }
+
+  lifecycle_rule {
+    id      = "abort-incomplete-multipart"
+    enabled = true
+    abort_incomplete_multipart_upload_days = 7
+  }
+}
+
 output "s3_bucket" {
   value = yandex_storage_bucket.assets.bucket
+}
+
+output "s3_private_bucket" {
+  value = yandex_storage_bucket.private.bucket
 }
 
 output "s3_access_key" {

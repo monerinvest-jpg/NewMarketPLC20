@@ -110,9 +110,14 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: str = ""
     SMTP_FROM: str = "no-reply@marketplace.com"
 
-    # Object storage (optional — if unset, uploads go to the local ./uploads dir)
+    # Object storage (optional — if unset, uploads go to the local ./uploads dir).
+    # S3_BUCKET holds PUBLIC assets (product images, media — per-object public-read).
+    # S3_PRIVATE_BUCKET holds PRIVATE assets (digital goods, HLS, KYC) served only
+    # via presigned URLs / gated proxy. If S3_PRIVATE_BUCKET is empty it falls back
+    # to S3_BUCKET (single-bucket mode), preserving older deployments.
     S3_ENDPOINT: str = ""
     S3_BUCKET: str = ""
+    S3_PRIVATE_BUCKET: str = ""
     S3_ACCESS_KEY: str = ""
     S3_SECRET_KEY: str = ""
     S3_PUBLIC_URL: str = ""

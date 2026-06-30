@@ -68,6 +68,7 @@
       # disk (single-node only). Set via Terraform-generated inventory [all:vars].
       S3_ENDPOINT: "{{ s3_endpoint | default('') }}"
       S3_BUCKET: "{{ s3_bucket | default('') }}"
+      S3_PRIVATE_BUCKET: "{{ s3_private_bucket | default('') }}"
       S3_ACCESS_KEY: "{{ s3_access_key | default('') }}"
       S3_SECRET_KEY: "{{ s3_secret_key | default('') }}"
       S3_PUBLIC_URL: "{{ s3_public_url | default('') }}"

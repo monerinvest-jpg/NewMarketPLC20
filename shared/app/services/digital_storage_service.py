@@ -65,6 +65,12 @@ def _s3_client():
     )
 
 
+def _priv_bucket() -> str:
+    """The PRIVATE bucket for digital goods / HLS / KYC. Falls back to the main
+    bucket when S3_PRIVATE_BUCKET isn't configured (single-bucket mode)."""
+    return getattr(settings, "S3_PRIVATE_BUCKET", "") or settings.S3_BUCKET
+
+
 async def save_digital_asset(content: bytes, content_type: str, original_name: str) -> Tuple[str, int]:
     """
     Validate and persist a digital file privately. Returns (storage_key, size).
@@ -85,7 +91,7 @@ async def save_digital_asset(content: bytes, content_type: str, original_name: s
     if _s3_configured():
         try:
             _s3_client().put_object(
-                Bucket=settings.S3_BUCKET, Key=key, Body=content,
+                Bucket=_priv_bucket(), Key=key, Body=content,
                 ContentType=content_type or "application/octet-stream",
             )
             return key, size
@@ -112,7 +118,7 @@ def save_bytes(key: str, content: bytes, content_type: str = "application/octet-
     playlists/segments/keys). S3 when configured, else local."""
     if _s3_configured():
         try:
-            _s3_client().put_object(Bucket=settings.S3_BUCKET, Key=key, Body=content, ContentType=content_type)
+            _s3_client().put_object(Bucket=_priv_bucket(), Key=key, Body=content, ContentType=content_type)
             return
         except Exception:
             pass
@@ -126,7 +132,7 @@ def read_bytes(key: str) -> Optional[bytes]:
     """Read a privately stored object's bytes (for gated proxy serving / packaging)."""
     if _s3_configured():
         try:
-            obj = _s3_client().get_object(Bucket=settings.S3_BUCKET, Key=key)
+            obj = _s3_client().get_object(Bucket=_priv_bucket(), Key=key)
             return obj["Body"].read()
         except Exception:
             return None
@@ -145,7 +151,7 @@ def presigned_url(key: str, file_name: str, expires: int = 300) -> Optional[str]
         return _s3_client().generate_presigned_url(
             "get_object",
             Params={
-                "Bucket": settings.S3_BUCKET,
+                "Bucket": _priv_bucket(),
                 "Key": key,
                 "ResponseContentDisposition": f'attachment; filename="{file_name}"',
             },
@@ -159,7 +165,7 @@ def delete_digital_asset(key: str) -> None:
     """Best-effort removal of a stored digital file."""
     if _s3_configured():
         try:
-            _s3_client().delete_object(Bucket=settings.S3_BUCKET, Key=key)
+            _s3_client().delete_object(Bucket=_priv_bucket(), Key=key)
             return
         except Exception:
             pass
