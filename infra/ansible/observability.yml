@@ -30,7 +30,10 @@
   become: true
   vars:
     obs_dir: /opt/observability
-    grafana_admin_password: "{{ grafana_admin_password | default('changeme') }}"
+    # Resolve to an override (-e grafana_admin_password=...) or a default.
+    # NB: must use a DIFFERENT name than the override to avoid a self-referential
+    # (recursive) template definition.
+    grafana_pw: "{{ grafana_admin_password | default('changeme', true) }}"
   tasks:
     - name: Ensure Docker is present
       apt: { name: docker.io, state: present, update_cache: true }
@@ -119,7 +122,7 @@
         docker rm -f grafana 2>/dev/null || true;
         docker run -d --name grafana --restart always
         -p 3000:3000 --link prometheus:prometheus
-        -e GF_SECURITY_ADMIN_PASSWORD={{ grafana_admin_password | quote }}
+        -e GF_SECURITY_ADMIN_PASSWORD={{ grafana_pw | quote }}
         -e GF_AUTH_ANONYMOUS_ENABLED=true
         -e GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
         -e GF_SECURITY_ALLOW_EMBEDDING=true
