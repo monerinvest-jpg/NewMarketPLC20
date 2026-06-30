@@ -37,6 +37,38 @@ variable "service_account_id" {
   type        = string
 }
 
+# ─── DNS (домен + поддомен кабинета продавца) ──────────────────────────────────
+
+variable "domain_name" {
+  description = "Корневой домен, напр. example.com. Пусто = DNS не создаётся, деплой по IP."
+  type        = string
+  default     = ""
+}
+
+variable "manage_dns_zone" {
+  description = "Создавать ли публичную зону Cloud DNS. false = использовать существующую (dns_zone_id)."
+  type        = bool
+  default     = true
+}
+
+variable "dns_zone_id" {
+  description = "ID существующей зоны Cloud DNS (когда manage_dns_zone=false)."
+  type        = string
+  default     = ""
+}
+
+variable "dns_ttl" {
+  description = "TTL DNS-записей (сек)."
+  type        = number
+  default     = 300
+}
+
+variable "dns_www" {
+  description = "Добавить CNAME www.<домен> → апекс."
+  type        = bool
+  default     = false
+}
+
 # ─── Object storage + email (Postbox) ──────────────────────────────────────────
 
 variable "postbox_sender_role" {

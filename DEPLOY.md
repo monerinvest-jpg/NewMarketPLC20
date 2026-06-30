@@ -107,7 +107,8 @@ yc iam service-account list               # → service_account_id (aje...)
 # Роли СА (минимум):
 FOLDER=<folder_id>; SA=<service_account_id>
 for role in editor container-registry.images.pusher container-registry.images.puller \
-            compute.editor vpc.admin mdb.admin load-balancer.admin iam.serviceAccounts.user; do
+            compute.editor vpc.admin mdb.admin load-balancer.admin iam.serviceAccounts.user \
+            dns.editor; do   # dns.editor — только если используете домен (см. §9-bis)
   yc resource-manager folder add-access-binding $FOLDER --role $role \
     --service-account-id $SA
 done
@@ -373,19 +374,37 @@ sider-меню (как в админке). Технически это **тот 
 `/products`, `/orders`, … Старые ссылки `<домен>/seller/*` на основном домене
 **редиректят** на поддомен.
 
-**Что нужно от инфраструктуры — только DNS (Kong/образ менять НЕ нужно):**
+**Инфраструктура = только DNS (Kong/образ/Ansible менять НЕ нужно).** Kong catch-all
+`/` и `/api/v1/*` маршрутизируются **по пути и host-agnostic**, поэтому тот же
+контейнер и тот же бэкенд обслуживают и `seller.<домен>`. API на поддомене вызывается
+по относительному `/api/v1` (тот же origin → `seller.<домен>/api/v1`), поэтому **CORS
+не нужен**. Авторизация в `localStorage` пер-origin → вход на `seller.<домен>`
+**отдельный** от витрины (как и требовалось).
 
-- Добавить запись `seller.<домен>` → тот же адрес, что и апекс-домен
-  (A-запись на IP NLB, либо CNAME на апекс). Kong catch-all `/` и `/api/v1/*`
-  маршрутизируются **по пути и host-agnostic**, поэтому тот же контейнер и тот же
-  бэкенд обслуживают и `seller.<домен>` без изменений в Kong.
-- API на поддомене вызывается по относительному `/api/v1` (тот же origin →
-  `seller.<домен>/api/v1`), так что **CORS по-прежнему не нужен**.
-- Авторизация хранится в `localStorage` пер-origin, поэтому вход на `seller.<домен>`
-  **отдельный** от витрины — это и требовалось.
+**DNS управляется Terraform** ([dns.tf](infra/terraform/dns.tf)) и включается одной
+переменной. Пусто = деплой по IP (как было).
 
-**TLS (когда включите HTTPS):** сертификат должен покрывать и апекс, и поддомен —
-выпустить **wildcard `*.<домен>`** или указать `seller.<домен>` в SAN.
+```hcl
+# terraform.tfvars
+domain_name     = "example.com"   # создаст зону Cloud DNS + A-записи апекс и seller
+# manage_dns_zone = false          # если домен уже делегирован в YC — класть в неё
+# dns_zone_id     = "dns..."        #   (id существующей зоны)
+```
+
+```bash
+cd infra/terraform && terraform apply
+terraform output dns_nameservers   # делегируйте домен на эти NS у регистратора
+terraform output app_url seller_url
+```
+
+Создаются записи: `example.com` (A) и `seller.example.com` (A) — **обе на один IP
+NLB** (`terraform output load_balancer_ip`). Нужна роль **`dns.editor`** у СА
+Terraform (см. §2). Если зону создаёт Terraform — однократно пропишите её NS-серверы
+у регистратора домена.
+
+**TLS (когда включите HTTPS):** NLB здесь L4 (TCP), TLS терминируется на Kong —
+это отдельный шаг (TLS-listener Kong + сертификат). Сертификат должен покрывать и
+апекс, и поддомен: **wildcard `*.<домен>`** либо `seller.<домен>` в SAN.
 
 **Локальная разработка** (у `localhost` нет поддомена): собрать/запустить бандл с
 `VITE_APP_TARGET=seller`, например `VITE_APP_TARGET=seller npm run dev` — тогда SPA

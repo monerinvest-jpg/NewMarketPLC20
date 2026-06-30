@@ -6,6 +6,16 @@ service_account_id = "aje..."   # ID сервис-аккаунта для instan
 # Путь к ВАШЕМУ публичному SSH-ключу (по умолчанию в репозитории — /home/it/.ssh/id_rsa.pub):
 public_ssh_key_path = "/home/youruser/.ssh/id_rsa.pub"
 
+# --- DNS: домен + поддомен кабинета продавца (опционально) ---
+# Пусто = деплой по IP (как было). Задайте домен, чтобы Terraform создал зону
+# Cloud DNS и A-записи: апекс + seller.<домен> → один и тот же балансировщик.
+# Требуется роль dns.editor у сервис-аккаунта Terraform.
+# domain_name     = "example.com"
+# manage_dns_zone = true            # false → класть записи в существующую зону (dns_zone_id)
+# dns_zone_id     = "dns..."        # если зона уже создана/делегирована в YC
+# dns_ttl         = 300
+# dns_www         = false           # CNAME www.<домен> → апекс
+
 # --- Опционально: переопределение дефолтов ---
 # project_name   = "handmade"        # ВНИМАНИЕ: инвентарь жёстко прописывает postgres_user=handmade_user.
 #                                    # Если меняете project_name — поправьте и outputs.tf (postgres_user/postgres_database).

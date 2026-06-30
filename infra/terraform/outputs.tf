@@ -1,6 +1,21 @@
 output "load_balancer_ip" {
   description = "Public IP of the load balancer"
-  value       = flatten([for listener in yandex_lb_network_load_balancer.public.listener : [for addr in listener.external_address_spec : addr.address]])[0]
+  value       = local.lb_ip
+}
+
+output "app_url" {
+  description = "URL витрины (домен, если задан, иначе IP)"
+  value       = local.dns_enabled ? "http://${var.domain_name}" : "http://${local.lb_ip}"
+}
+
+output "seller_url" {
+  description = "URL кабинета продавца (поддомен; по IP поддомен недоступен)"
+  value       = local.dns_enabled ? "http://seller.${var.domain_name}" : "n/a (нужен domain_name)"
+}
+
+output "dns_nameservers" {
+  description = "NS-серверы Yandex Cloud DNS — делегируйте на них домен у регистратора (если зона создаётся здесь)"
+  value       = local.create_zone ? ["ns1.yandexcloud.net.", "ns2.yandexcloud.net."] : []
 }
 
 output "bastion_public_ip" {
