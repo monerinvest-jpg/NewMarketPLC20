@@ -49,6 +49,10 @@
         - _ca is failed
         - not (lookup('ansible.builtin.fileglob', playbook_dir + '/files/root.crt'))
 
+# Kong itself (Postgres-backed) — must be UP before deploy-services configures its
+# routes via the Admin API, otherwise that play gets Connection refused on :8001.
+- import_playbook: kong-setup.yml
+
 # Backend: images → migrate + seed → 5 services + worker/beat → Kong routes/plugin.
 - import_playbook: deploy-services.yml
 

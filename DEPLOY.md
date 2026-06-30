@@ -271,9 +271,11 @@ ansible -m ping all
 # CA БД (скачается сам, шаг 3 можно пропустить) → backend (migrate+сервисы+Kong) → frontend
 ansible-playbook ../ansible/deploy-all.yml
 
-# ── Вариант 2: по отдельности ──
-ansible-playbook ../ansible/deploy-services.yml   # только backend
-ansible-playbook ../ansible/deploy-frontend.yml   # только frontend
+# ── Вариант 2: по отдельности (порядок важен!) ──
+ansible-playbook ../ansible/kong-setup.yml        # СНАЧАЛА поднять сам Kong (иначе routes-play
+                                                  #   упадёт: Connection refused на :8001)
+ansible-playbook ../ansible/deploy-services.yml   # backend + маршруты Kong
+ansible-playbook ../ansible/deploy-frontend.yml   # frontend
 ```
 
 > **`deploy-all.yml`** — мастер-плейбук: сам докачивает CA-сертификат БД, затем

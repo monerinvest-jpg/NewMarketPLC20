@@ -65,6 +65,7 @@ postgres_user=handmade_user
 postgres_database=${var.project_name}_${var.environment}
 redis_host=${yandex_mdb_redis_cluster.cache.host[0].fqdn}
 redis_password=${random_password.redis_password.result}
+kong_password=${random_password.kong_password.result}
 s3_endpoint=https://storage.yandexcloud.net
 s3_bucket=${yandex_storage_bucket.assets.bucket}
 s3_access_key=${yandex_iam_service_account_static_access_key.storage_key.access_key}
