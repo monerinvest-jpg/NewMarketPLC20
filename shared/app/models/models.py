@@ -486,6 +486,53 @@ class InstallmentPlan(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
 
 
+# ─── Seller Academy (platform-authored education for sellers; reuses the LMS
+#     pattern of courses → lessons → progress, decoupled from sellable products) ──
+
+class AcademyCourse(Base):
+    __tablename__ = "academy_course"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    cover_url: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
+    level: Mapped[str] = mapped_column(String(20), default="beginner", nullable=False)  # beginner|intermediate|advanced
+    sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    is_published: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+
+    lessons: Mapped[List["AcademyLesson"]] = relationship(
+        "AcademyLesson", back_populates="course", cascade="all, delete-orphan", order_by="AcademyLesson.sort_order"
+    )
+
+
+class AcademyLesson(Base):
+    __tablename__ = "academy_lesson"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    course_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("academy_course.id"), nullable=False)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    content_type: Mapped[str] = mapped_column(String(10), default="text", nullable=False)  # text|video|link
+    body: Mapped[Optional[str]] = mapped_column(Text, nullable=True)        # markdown/text for text lessons
+    video_url: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)  # video or external link
+    sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+
+    course: Mapped["AcademyCourse"] = relationship("AcademyCourse", back_populates="lessons")
+
+
+class AcademyProgress(Base):
+    __tablename__ = "academy_progress"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("user.id"), nullable=False)
+    lesson_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("academy_lesson.id"), nullable=False)
+    completed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "lesson_id", name="uq_academy_progress_user_lesson"),
+    )
+
+
 class Category(Base):
     __tablename__ = "category"
 

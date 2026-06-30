@@ -56,6 +56,7 @@ MENU_ITEMS = [
     ("/admin/referrals", "Рефералы", "marketing.manage"),
     ("/admin/plans", "Тарифы", "settings.edit"),
     ("/admin/paid-features", "Платные возможности", "settings.edit"),
+    ("/admin/academy", "Академия продавца", "settings.edit"),
     ("/admin/currencies", "Валюты", "settings.edit"),
     ("/admin/reports", "Жалобы", "moderate.reviews"),
     ("/admin/feature-flags", "Feature flags", "feature_flags.manage"),

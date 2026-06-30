@@ -70,6 +70,7 @@ const groups = [
     children: [
       { key: '/admin/plans', icon: <CreditCardOutlined />, label: 'Тарифы' },
       { key: '/admin/paid-features', icon: <RiseOutlined />, label: 'Платные возможности' },
+      { key: '/admin/academy', icon: <RiseOutlined />, label: 'Академия продавца' },
       { key: '/admin/currencies', icon: <DollarOutlined />, label: 'Валюты' },
       { key: '/admin/reports', icon: <WarningOutlined />, label: 'Жалобы' },
       { key: '/admin/feature-flags', icon: <SettingOutlined />, label: 'Feature flags' },

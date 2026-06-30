@@ -16,6 +16,7 @@ from app.api.v1.endpoints.loyalty import (
     admin_router as loyalty_admin_router,
 )
 from app.api.v1.endpoints.admin import router as admin_router
+from app.api.v1.endpoints.academy import admin_router as academy_admin_router
 # Admin-side promotion moderation lives under /admin/* — kept in platform so the
 # whole /admin/* prefix routes to one service.
 from app.api.v1.endpoints.promotions import admin_router as promo_admin_router
@@ -37,5 +38,6 @@ app = create_service_app(
         currency_router,
         reports_router,
         admin_router,
+        academy_admin_router,
     ],
 )

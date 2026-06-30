@@ -391,6 +391,15 @@ export const adminApi = {
   previewSegment: (segment: any) => api.post<{ count: number }>('/admin/campaigns/preview', { segment }).then(r => r.data),
   createCampaign: (data: any) => api.post('/admin/campaigns', data).then(r => r.data),
   sendCampaign: (id: number) => api.post(`/admin/campaigns/${id}/send`).then(r => r.data),
+  // Seller Academy (admin authoring)
+  academyCourses: () => api.get<any[]>('/admin/academy/courses').then(r => r.data),
+  academyCreateCourse: (data: any) => api.post('/admin/academy/courses', data).then(r => r.data),
+  academyUpdateCourse: (id: number, data: any) => api.put(`/admin/academy/courses/${id}`, data).then(r => r.data),
+  academyDeleteCourse: (id: number) => api.delete(`/admin/academy/courses/${id}`),
+  academyLessons: (courseId: number) => api.get<any[]>(`/admin/academy/courses/${courseId}/lessons`).then(r => r.data),
+  academyAddLesson: (courseId: number, data: any) => api.post(`/admin/academy/courses/${courseId}/lessons`, data).then(r => r.data),
+  academyUpdateLesson: (id: number, data: any) => api.put(`/admin/academy/lessons/${id}`, data).then(r => r.data),
+  academyDeleteLesson: (id: number) => api.delete(`/admin/academy/lessons/${id}`),
   // Block D: SMS (SMSC.ru) section
   smsStatus: () => api.get<any>('/admin/sms/status').then(r => r.data),
   smsUpdateSettings: (data: Record<string, any>) =>
@@ -841,6 +850,13 @@ export const disputesApi = {
   assignMe: (id: number) => api.post<Dispute>(`/disputes/${id}/assign-me`).then(r => r.data),
   resolve: (id: number, data: { resolution: string; refund_amount?: number; note?: string }) =>
     api.post<Dispute>(`/disputes/${id}/resolve`, data).then(r => r.data),
+}
+
+// ─── Seller Academy (seller-facing) ────────────────────────────────────────
+export const academyApi = {
+  courses: () => api.get<any[]>('/seller/academy/courses').then(r => r.data),
+  course: (id: number) => api.get<any>(`/seller/academy/courses/${id}`).then(r => r.data),
+  completeLesson: (id: number) => api.post(`/seller/academy/lessons/${id}/complete`).then(r => r.data),
 }
 
 // ─── Gift certificates ─────────────────────────────────────────────────────
