@@ -1,0 +1,56 @@
+# One-command full deploy of the whole marketplace.
+#
+# Configures EVERYTHING automatically end-to-end:
+#   1. ensures the Managed-PostgreSQL CA cert is present (downloads it if missing);
+#   2. backend: pulls fresh images, runs DB migrations (0001→latest) + seed,
+#      starts all 5 services (ports 8001-8005) + Celery worker/beat, configures
+#      Kong (one route per path prefix + Prometheus plugin);
+#   3. frontend: runs the SPA container and adds the Kong catch-all '/' route.
+#
+# Prerequisite: `terraform apply` has been run (so infra/terraform/hosts.ini and
+# the Managed PG/Redis/Kong/backend groups exist), and the images are pushed
+# (`bash build-and-push.sh`).
+#
+# Run FROM infra/terraform/ (it has hosts.ini + ansible.cfg):
+#   cd infra/terraform
+#   ansible-playbook ../ansible/deploy-all.yml
+#
+# Observability (Prometheus + Grafana) is intentionally NOT included here because
+# it needs a separate [monitoring] inventory host — run it on demand:
+#   ansible-playbook ../ansible/observability.yml
+---
+- name: Pre-flight — ensure the Managed PostgreSQL CA certificate is present
+  hosts: localhost
+  gather_facts: false
+  connection: local
+  tasks:
+    - name: Create files/ directory
+      file:
+        path: "{{ playbook_dir }}/files"
+        state: directory
+        mode: "0755"
+
+    - name: Download the Yandex CA bundle (skipped if it already exists)
+      get_url:
+        url: https://storage.yandexcloud.net/cloud-certs/CA.pem
+        dest: "{{ playbook_dir }}/files/root.crt"
+        mode: "0644"
+        force: false
+      register: _ca
+      ignore_errors: true
+
+    - name: Warn if the CA is missing and could not be downloaded
+      fail:
+        msg: >-
+          {{ playbook_dir }}/files/root.crt is missing and could not be downloaded.
+          Place the Yandex Managed PostgreSQL CA there (or set DB_SSL: "false" in
+          deploy-services.yml app_env if connecting in-VPC without TLS).
+      when:
+        - _ca is failed
+        - not (lookup('ansible.builtin.fileglob', playbook_dir + '/files/root.crt'))
+
+# Backend: images → migrate + seed → 5 services + worker/beat → Kong routes/plugin.
+- import_playbook: deploy-services.yml
+
+# Frontend: independent SPA container behind the Kong catch-all '/' route.
+- import_playbook: deploy-frontend.yml

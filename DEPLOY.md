@@ -238,6 +238,9 @@ docker push $REG/handmade-frontend:latest
 
 ## 5. Шаг 3 — CA-сертификат Managed PostgreSQL
 
+> При запуске **`deploy-all.yml`** этот шаг можно пропустить — мастер-плейбук
+> сам докачает CA в `infra/ansible/files/root.crt`. Ручной вариант ниже.
+
 Сервисы ходят в БД по TLS (`DB_SSL=true`). Положите CA Yandex:
 
 ```bash
@@ -264,11 +267,20 @@ cd infra/terraform
 # Проверка связи (SSH автоматически идёт через бастион — это в hosts.ini):
 ansible -m ping all
 
-# Выкат:
-ansible-playbook ../ansible/deploy-services.yml
+# ── Вариант 1 (рекомендуется): всё одной командой ──
+# CA БД (скачается сам, шаг 3 можно пропустить) → backend (migrate+сервисы+Kong) → frontend
+ansible-playbook ../ansible/deploy-all.yml
+
+# ── Вариант 2: по отдельности ──
+ansible-playbook ../ansible/deploy-services.yml   # только backend
+ansible-playbook ../ansible/deploy-frontend.yml   # только frontend
 ```
 
-Что делает плейбук по шагам:
+> **`deploy-all.yml`** — мастер-плейбук: сам докачивает CA-сертификат БД, затем
+> импортирует `deploy-services.yml` + `deploy-frontend.yml`. То есть «настроить все
+> сервисы автоматически» = одна команда. (Наблюдаемость — отдельно: `observability.yml`.)
+
+Что делают плейбуки по шагам:
 
 1. **Секреты:** генерирует общие `SECRET_KEY` / `REFRESH_SECRET_KEY` (по разу на все узлы).
 2. **Docker:** ставит при необходимости, логинит в Container Registry по IAM-токену.
@@ -384,11 +396,10 @@ bash build-and-push.sh        # 6 backend + frontend
 # ── 3. CA БД ──
 curl -o infra/ansible/files/root.crt https://storage.yandexcloud.net/cloud-certs/CA.pem
 
-# ── 4. DEPLOY ──
+# ── 4. DEPLOY (всё одной командой) ──
 cd infra/terraform
 ansible -m ping all
-ansible-playbook ../ansible/deploy-services.yml      # backend + миграции + Kong
-ansible-playbook ../ansible/deploy-frontend.yml      # фронт-контейнер + catch-all
+ansible-playbook ../ansible/deploy-all.yml           # CA → backend+миграции+Kong → frontend
 # ansible-playbook ../ansible/observability.yml      # (опц.) Prometheus + Grafana
 
 # ── 5. VERIFY ──
