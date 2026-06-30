@@ -230,7 +230,7 @@ export default function SellerProducts() {
             render: (_, p) => (
               <Space>
                 {p.product_type === 'course' && (
-                  <Button size="small" onClick={() => navigate(`/seller/courses/${p.id}`)}>Курс</Button>
+                  <Button size="small" onClick={() => navigate(`/courses/${p.id}`)}>Курс</Button>
                 )}
                 <Button size="small" icon={<EditOutlined />} onClick={() => openEdit(p)} />
                 <Popconfirm title="Удалить товар?" onConfirm={() => handleDelete(p.id)}>

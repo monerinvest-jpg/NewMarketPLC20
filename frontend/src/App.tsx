@@ -8,6 +8,7 @@ import { useAuthStore } from './store/authStore'
 import MainLayout from './components/layout/MainLayout'
 import AdminLayout from './components/layout/AdminLayout'
 import ProtectedRoute from './components/common/ProtectedRoute'
+import { isSellerHost, sellerOrigin } from './lib/sellerHost'
 
 // Public pages
 const HomePage = lazy(() => import('./pages/catalog/HomePage'))
@@ -29,19 +30,11 @@ const ReferralPage = lazy(() => import('./pages/buyer/ReferralPage'))
 const MyDownloadsPage = lazy(() => import('./pages/buyer/MyDownloadsPage'))
 const LearningPage = lazy(() => import('./pages/buyer/LearningPage'))
 const CoursePlayerPage = lazy(() => import('./pages/buyer/CoursePlayerPage'))
-const SellerCourseBuilder = lazy(() => import('./pages/seller/SellerCourseBuilder'))
 const CertificateVerifyPage = lazy(() => import('./pages/catalog/CertificateVerifyPage'))
 
-// Seller pages
-const SellerDashboard = lazy(() => import('./pages/seller/SellerDashboard'))
-const SellerProducts = lazy(() => import('./pages/seller/SellerProducts'))
-const SellerOrders = lazy(() => import('./pages/seller/SellerOrders'))
-const SellerShopSettings = lazy(() => import('./pages/seller/SellerShopSettings'))
-const SellerReviews = lazy(() => import('./pages/seller/SellerReviews'))
-const SellerPlanPage = lazy(() => import('./pages/seller/SellerPlanPage'))
-const SellerCoupons = lazy(() => import('./pages/seller/SellerCoupons'))
-const SellerPayouts = lazy(() => import('./pages/seller/SellerPayouts'))
-const SellerAnalytics = lazy(() => import('./pages/seller/SellerAnalytics'))
+// Seller cabinet — lives on its own host (seller.<domain>) as a standalone app.
+const SellerApp = lazy(() => import('./seller/SellerApp'))
+
 const ChatPage = lazy(() => import('./pages/buyer/ChatPage'))
 const ComparePage = lazy(() => import('./pages/catalog/ComparePage'))
 
@@ -82,29 +75,16 @@ const GiftCertificatesPage = lazy(() => import('./pages/buyer/GiftCertificatesPa
 const LoyaltyPage = lazy(() => import('./pages/buyer/LoyaltyPage'))
 const AdminGiftCertificates = lazy(() => import('./pages/admin/AdminGiftCertificates'))
 const AdminLoyaltyTiers = lazy(() => import('./pages/admin/AdminLoyaltyTiers'))
-const SellerDisputes = lazy(() => import('./pages/seller/SellerDisputes'))
 const DisputeDesk = lazy(() => import('./pages/support/DisputeDesk'))
 const SupportDesk = lazy(() => import('./pages/support/SupportDesk'))
-const SellerPromotion = lazy(() => import('./pages/seller/SellerPromotion'))
-const SellerPromoRules = lazy(() => import('./pages/seller/SellerPromoRules'))
 const AdminPaidFeatures = lazy(() => import('./pages/admin/AdminPaidFeatures'))
 const ProductSubscriptionsPage = lazy(() => import('./pages/buyer/ProductSubscriptionsPage'))
 const AddressBookPage = lazy(() => import('./pages/buyer/AddressBookPage'))
 const WishlistsPage = lazy(() => import('./pages/buyer/WishlistsPage'))
-const SellerReturns = lazy(() => import('./pages/seller/SellerReturns'))
-const SellerImport = lazy(() => import('./pages/seller/SellerImport'))
-const SellerInventory = lazy(() => import('./pages/seller/SellerInventory'))
-const SellerFlashSales = lazy(() => import('./pages/seller/SellerFlashSales'))
-const SellerChatTemplates = lazy(() => import('./pages/seller/SellerChatTemplates'))
-const SellerRequisitesPage = lazy(() => import('./pages/seller/SellerRequisitesPage'))
-const SellerStaff = lazy(() => import('./pages/seller/SellerStaff'))
-const SellerTrust = lazy(() => import('./pages/seller/SellerTrust'))
 const AdminVerifications = lazy(() => import('./pages/admin/AdminVerifications'))
 const AdminCampaigns = lazy(() => import('./pages/admin/AdminCampaigns'))
 const AdminAcademy = lazy(() => import('./pages/admin/AdminAcademy'))
-const SellerAcademy = lazy(() => import('./pages/seller/SellerAcademy'))
 const CustomRequestsPage = lazy(() => import('./pages/buyer/CustomRequestsPage'))
-const SellerCustomRequests = lazy(() => import('./pages/seller/SellerCustomRequests'))
 
 // Craft / wood theme: warm amber-terracotta accents on parchment, walnut text,
 // softer radii. Evokes handmade goods rather than a cold marketplace.
@@ -131,6 +111,16 @@ const antdTheme = {
   },
 }
 
+// Bridges a legacy main-domain /seller/* URL to the seller cabinet host,
+// preserving the sub-path (/seller/products -> seller.<domain>/products).
+function SellerRedirect() {
+  useEffect(() => {
+    const rest = window.location.pathname.replace(/^\/seller/, '') || '/'
+    window.location.replace(sellerOrigin() + rest + window.location.search)
+  }, [])
+  return <div className="flex items-center justify-center h-screen"><Spin size="large" /></div>
+}
+
 function App() {
   const { fetchMe, accessToken } = useAuthStore()
   const { i18n } = useTranslation()
@@ -140,6 +130,20 @@ function App() {
       fetchMe()
     }
   }, [])
+
+  // On seller.<domain> the bundle renders the standalone seller cabinet
+  // (its own login + sider layout) instead of the storefront.
+  if (isSellerHost()) {
+    return (
+      <ConfigProvider locale={i18n.language === 'en' ? enUS : ruRU} theme={antdTheme}>
+        <BrowserRouter>
+          <Suspense fallback={<div className="flex items-center justify-center h-screen"><Spin size="large" /></div>}>
+            <SellerApp />
+          </Suspense>
+        </BrowserRouter>
+      </ConfigProvider>
+    )
+  }
 
   return (
     <ConfigProvider locale={i18n.language === 'en' ? enUS : ruRU} theme={antdTheme}>
@@ -193,32 +197,9 @@ function App() {
                 <Route path="/dispute-desk" element={<DisputeDesk />} />
               </Route>
 
-              {/* Seller protected */}
-              <Route element={<ProtectedRoute roles={['seller', 'superadmin']} />}>
-                <Route path="/seller" element={<SellerDashboard />} />
-                <Route path="/seller/products" element={<SellerProducts />} />
-                <Route path="/seller/courses/:productId" element={<SellerCourseBuilder />} />
-                <Route path="/seller/orders" element={<SellerOrders />} />
-                <Route path="/seller/shop" element={<SellerShopSettings />} />
-                <Route path="/seller/reviews" element={<SellerReviews />} />
-                <Route path="/seller/plan" element={<SellerPlanPage />} />
-                <Route path="/seller/promotion" element={<SellerPromotion />} />
-                <Route path="/seller/promo-rules" element={<SellerPromoRules />} />
-                <Route path="/seller/disputes" element={<SellerDisputes />} />
-                <Route path="/seller/coupons" element={<SellerCoupons />} />
-                <Route path="/seller/payouts" element={<SellerPayouts />} />
-                <Route path="/seller/analytics" element={<SellerAnalytics />} />
-                <Route path="/seller/returns" element={<SellerReturns />} />
-                <Route path="/seller/import" element={<SellerImport />} />
-                <Route path="/seller/inventory" element={<SellerInventory />} />
-                <Route path="/seller/flash-sales" element={<SellerFlashSales />} />
-                <Route path="/seller/chat-templates" element={<SellerChatTemplates />} />
-                <Route path="/seller/requisites" element={<SellerRequisitesPage />} />
-                <Route path="/seller/staff" element={<SellerStaff />} />
-                <Route path="/seller/trust" element={<SellerTrust />} />
-                <Route path="/seller/academy" element={<SellerAcademy />} />
-                <Route path="/seller/custom-requests" element={<SellerCustomRequests />} />
-              </Route>
+              {/* Seller cabinet moved to its own host (seller.<domain>).
+                  Any legacy /seller/* link on the main domain is redirected. */}
+              <Route path="/seller/*" element={<SellerRedirect />} />
             </Route>
 
             {/* Admin routes */}

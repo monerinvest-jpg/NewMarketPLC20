@@ -11,6 +11,7 @@ import { useCurrencyStore } from '@/store/currencyStore'
 import { currencyApi } from '@/api'
 import { useAuthStore } from '@/store/authStore'
 import { useCartStore } from '@/store/cartStore'
+import { sellerOrigin } from '@/lib/sellerHost'
 import { useEffect, useState } from 'react'
 import { useNavigate as useNav } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -85,30 +86,9 @@ export default function MainLayout() {
     },
     ...(isSeller
       ? [{
-          key: 'grp-seller', label: 'Кабинет продавца', icon: <ShopOutlined />,
-          children: [
-            { key: 'seller', label: <Link to="/seller">Обзор</Link> },
-            { key: 'seller-products', label: <Link to="/seller/products">Товары</Link> },
-            { key: 'seller-orders', label: <Link to="/seller/orders">Заказы</Link> },
-            { key: 'seller-custom', label: <Link to="/seller/custom-requests">Запросы на изготовление</Link> },
-            { key: 'seller-analytics', label: <Link to="/seller/analytics">Аналитика продаж</Link> },
-            { key: 'seller-reviews', label: <Link to="/seller/reviews">Отзывы на товары</Link> },
-            { key: 'seller-returns', label: <Link to="/seller/returns">Возвраты</Link> },
-            { key: 'seller-coupons', label: <Link to="/seller/coupons">Мои промокоды</Link> },
-            { key: 'seller-import', label: <Link to="/seller/import">Импорт товаров (CSV)</Link> },
-            { key: 'seller-inventory', label: <Link to="/seller/inventory">Склад</Link> },
-            { key: 'seller-flash-sales', label: <Link to="/seller/flash-sales">Акции и распродажи</Link> },
-            { key: 'seller-promo-rules', label: <Link to="/seller/promo-rules">Акции и наборы</Link> },
-            { key: 'seller-promotion', label: <Link to="/seller/promotion">Продвижение</Link> },
-            { key: 'seller-chat-templates', label: <Link to="/seller/chat-templates">Чат: шаблоны и часы</Link> },
-            { key: 'seller-requisites', label: <Link to="/seller/requisites">Налоговые реквизиты</Link> },
-            { key: 'seller-staff', label: <Link to="/seller/staff">Сотрудники</Link> },
-            { key: 'seller-trust', label: <Link to="/seller/trust">Доверие и статус (KYC/VIP)</Link> },
-            { key: 'seller-academy', label: <Link to="/seller/academy">Академия продавца</Link> },
-            { key: 'seller-payouts', label: <Link to="/seller/payouts">Вывод средств</Link> },
-            { key: 'seller-plan', label: <Link to="/seller/plan">Тариф и комиссия</Link> },
-            { key: 'seller-disputes', label: <Link to="/seller/disputes">Споры по заказам</Link> },
-          ],
+          key: 'seller-cabinet', icon: <ShopOutlined />,
+          // The seller cabinet lives on its own host (seller.<domain>); open it there.
+          label: <a href={sellerOrigin() + '/'}>Кабинет продавца</a>,
         }]
       : []),
     ...(isStaff

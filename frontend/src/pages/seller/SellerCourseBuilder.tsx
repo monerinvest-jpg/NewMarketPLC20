@@ -149,7 +149,7 @@ export default function SellerCourseBuilder() {
   return (
     <div className="max-w-4xl mx-auto py-4">
       <Space style={{ marginBottom: 16 }}>
-        <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/seller/products')}>Назад</Button>
+        <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/products')}>Назад</Button>
         <Title level={3} style={{ margin: 0 }}>Курс: {course.title}</Title>
       </Space>
 

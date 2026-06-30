@@ -72,7 +72,7 @@ export default function SellerShopSettings() {
               Комиссия зависит от вашего тарифа. Управлять тарифом можно на странице «Тариф и комиссия».
             </Text>
           </div>
-          <Link to="/seller/plan"><Button>Выбрать тариф</Button></Link>
+          <Link to="/plan"><Button>Выбрать тариф</Button></Link>
         </div>
       </Card>
 

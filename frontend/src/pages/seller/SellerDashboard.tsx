@@ -72,7 +72,7 @@ export default function SellerDashboard() {
         <Title level={3} style={{ margin: 0 }}>
           <ShopOutlined /> {shop.name}
         </Title>
-        <Link to="/seller/products">
+        <Link to="/products">
           <Button type="primary" icon={<PlusOutlined />}>Добавить товар</Button>
         </Link>
       </div>
@@ -100,7 +100,7 @@ export default function SellerDashboard() {
       <Card title="Последние товары">
         {products.length === 0 ? (
           <Empty description="У вас пока нет товаров">
-            <Link to="/seller/products"><Button type="primary">Добавить первый товар</Button></Link>
+            <Link to="/products"><Button type="primary">Добавить первый товар</Button></Link>
           </Empty>
         ) : (
           products.map((p) => (
