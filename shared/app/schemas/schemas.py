@@ -514,6 +514,10 @@ class OrderCreate(BaseModel):
     bonus_to_use: Decimal = Field(default=Decimal("0"), ge=0)
     # Referral earnings to spend; can cover up to 100% of the order.
     referral_to_use: Decimal = Field(default=Decimal("0"), ge=0)
+    # Gift options
+    is_gift: bool = False
+    gift_wrap: bool = False
+    gift_message: Optional[str] = Field(default=None, max_length=500)
 
 
 class OrderStatusUpdate(BaseModel):
@@ -535,6 +539,9 @@ class OrderOut(OrmBase):
     coupon_discount: Decimal
     status: OrderStatus
     delivery_address: str
+    is_gift: bool = False
+    gift_wrap: bool = False
+    gift_message: Optional[str] = None
     items: List[OrderItemOut] = []
     payment: Optional["PaymentOut"] = None
     delivery_info: Optional[DeliveryInfoOut] = None

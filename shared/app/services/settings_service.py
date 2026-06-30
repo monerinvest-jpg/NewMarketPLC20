@@ -53,6 +53,8 @@ DEFAULTS: Dict[str, str] = {
     # Multi-delivery: comma-separated service codes enabled at checkout
     # (cdek, ozon, yandex, russian_post). Empty = all enabled.
     "delivery_enabled_services": "cdek,ozon,yandex,russian_post",
+    # Gift options: price of optional gift wrapping (added to order total).
+    "gift_wrap_price": "150",
 }
 
 DESCRIPTIONS: Dict[str, str] = {

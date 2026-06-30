@@ -197,8 +197,18 @@ async def create_order(
         discount = (bonus_to_use + coupon_discount + promo_discount).quantize(Decimal("0.01"))
         if discount > subtotal:
             discount = subtotal
+    # Gift wrapping is a paid add-on (admin-tunable gift_wrap_price), charged on
+    # top of the goods+delivery and folded into the order total.
+    gift_wrap_cost = Decimal("0.00")
+    if payload.gift_wrap:
+        from app.services.settings_service import get_setting
+        try:
+            gift_wrap_cost = Decimal((await get_setting(db, "gift_wrap_price")) or "0").quantize(Decimal("0.01"))
+        except Exception:
+            gift_wrap_cost = Decimal("0.00")
+
     total_price = max(
-        (subtotal + delivery_cost - discount).quantize(Decimal("0.01")),
+        (subtotal + delivery_cost + gift_wrap_cost - discount).quantize(Decimal("0.01")),
         Decimal("1.00"),
     )
 
@@ -247,6 +257,9 @@ async def create_order(
         status=OrderStatus.pending_payment,
         delivery_address=payload.delivery_address,
         coupon_id=coupon_obj.id if coupon_obj else None,
+        is_gift=payload.is_gift or payload.gift_wrap or bool(payload.gift_message),
+        gift_wrap=payload.gift_wrap,
+        gift_message=(payload.gift_message or None),
     )
     db.add(order)
     await db.flush()

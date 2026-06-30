@@ -188,6 +188,12 @@ export default function OrderDetailPage() {
           {order.delivery_info && (
             <Descriptions.Item label="Срок доставки">{order.delivery_info.estimated_days} дн.</Descriptions.Item>
           )}
+          {order.is_gift && (
+            <Descriptions.Item label="🎁 Подарок">
+              {order.gift_wrap ? 'С подарочной упаковкой' : 'Без упаковки'}
+              {order.gift_message ? ` · «${order.gift_message}»` : ''}
+            </Descriptions.Item>
+          )}
         </Descriptions>
       </Card>
 

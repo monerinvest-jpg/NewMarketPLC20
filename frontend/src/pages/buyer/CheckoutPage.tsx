@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Form, Input, Button, Card, Typography, Divider, message,
-  Steps, InputNumber, Spin, Alert, Radio, Select
+  Steps, InputNumber, Spin, Alert, Radio, Select, Checkbox
 } from 'antd'
 import { useCartStore } from '@/store/cartStore'
 import { useAuthStore } from '@/store/authStore'
@@ -30,8 +30,18 @@ export default function CheckoutPage() {
   const [pickupLoading, setPickupLoading] = useState(false)
   const [selectedPickupCode, setSelectedPickupCode] = useState<string | undefined>()
   const [savedAddresses, setSavedAddresses] = useState<any[]>([])
+  const [isGift, setIsGift] = useState(false)
+  const [giftWrap, setGiftWrap] = useState(false)
+  const [giftMessage, setGiftMessage] = useState('')
+  const [giftWrapPrice, setGiftWrapPrice] = useState(0)
 
   useEffect(() => { fetchCart() }, [])
+
+  useEffect(() => {
+    import('@/api').then(({ usersApi }) =>
+      usersApi.publicConfig().then((c) => setGiftWrapPrice(parseFloat(c.gift_wrap_price || '0'))).catch(() => {})
+    )
+  }, [])
 
   useEffect(() => {
     if (user) {
@@ -133,6 +143,9 @@ export default function CheckoutPage() {
         coupon_code: couponCode || undefined,
         bonus_to_use: bonusToUse || undefined,
         referral_to_use: referralToUse || undefined,
+        is_gift: isGift || giftWrap || !!giftMessage.trim() || undefined,
+        gift_wrap: giftWrap || undefined,
+        gift_message: giftMessage.trim() || undefined,
       })
       message.success('Заказ создан!')
       if (order.payment?.confirmation_url) {
@@ -153,7 +166,8 @@ export default function CheckoutPage() {
 
   const subtotal = totalPrice()
   const deliveryCost = delivery ? parseFloat(delivery.cost) : 0
-  const total = Math.max(subtotal + deliveryCost - bonusToUse - referralToUse, 0)
+  const giftWrapCost = giftWrap ? giftWrapPrice : 0
+  const total = Math.max(subtotal + deliveryCost + giftWrapCost - bonusToUse - referralToUse, 0)
 
   return (
     <div style={{ maxWidth: 800, margin: '0 auto' }}>
@@ -286,6 +300,24 @@ export default function CheckoutPage() {
               </Form.Item>
             )}
 
+            <Form.Item label="🎁 Подарок">
+              <Checkbox checked={isGift} onChange={(e) => setIsGift(e.target.checked)}>
+                Это подарок
+              </Checkbox>
+              {isGift && (
+                <div style={{ marginTop: 8 }}>
+                  <Checkbox checked={giftWrap} onChange={(e) => setGiftWrap(e.target.checked)}>
+                    Подарочная упаковка{giftWrapPrice > 0 ? ` (+${giftWrapPrice.toLocaleString('ru')} ₽)` : ''}
+                  </Checkbox>
+                  <Input.TextArea
+                    rows={2} style={{ marginTop: 8 }} maxLength={500}
+                    placeholder="Поздравление для получателя (необязательно)"
+                    value={giftMessage} onChange={(e) => setGiftMessage(e.target.value)}
+                  />
+                </div>
+              )}
+            </Form.Item>
+
             <Button type="primary" htmlType="submit" size="large" block loading={submitting}>
               Перейти к оплате
             </Button>
@@ -318,6 +350,12 @@ export default function CheckoutPage() {
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
               <Text>Реферальный баланс:</Text>
               <Text style={{ color: '#52c41a' }}>−{referralToUse.toLocaleString('ru')} ₽</Text>
+            </div>
+          )}
+          {giftWrapCost > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+              <Text>🎁 Упаковка:</Text>
+              <Text>{giftWrapCost.toLocaleString('ru')} ₽</Text>
             </div>
           )}
           <Divider />

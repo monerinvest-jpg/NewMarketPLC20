@@ -55,6 +55,7 @@ export const usersApi = {
     api.patch<User>('/users/me', data).then(r => r.data),
 
   getReferralStats: () => api.get<ReferralStats>('/users/me/referral-stats').then(r => r.data),
+  publicConfig: () => api.get<{ gift_wrap_price: string }>('/users/public-config').then(r => r.data),
 
   getBalanceHistory: () => api.get('/users/me/balance-history').then(r => r.data),
 
@@ -264,7 +265,8 @@ export const cartApi = {
 export const ordersApi = {
   create: (data: {
     delivery_address: string; city_to: string;
-    coupon_code?: string; bonus_to_use?: number; referral_to_use?: number
+    coupon_code?: string; bonus_to_use?: number; referral_to_use?: number;
+    is_gift?: boolean; gift_wrap?: boolean; gift_message?: string
   }) => api.post<Order>('/orders', data).then(r => r.data),
 
   list: (params?: { page?: number; page_size?: number }) =>

@@ -60,6 +60,25 @@ async def purchase(
     )
     db.add(cert)
     await db.flush()
+
+    # If gifted to someone, email them the code (best-effort; never blocks purchase).
+    if recipient_email:
+        try:
+            from app.core.config import settings
+            from app.services.email_service import send_email, _wrap_html
+            link = f"{settings.FRONTEND_URL.rstrip('/')}/gift-certificates"
+            lines = [
+                f"<b>{buyer.full_name}</b> дарит вам подарочный сертификат на <b>{amount} ₽</b>.",
+            ]
+            if message:
+                lines.append(f"«{message}»")
+            lines.append(f"Ваш код: <span style='font-size:22px;font-weight:700;letter-spacing:2px;color:#7c4a21'>{cert.code}</span>")
+            lines.append("Активируйте его в личном кабинете — баланс зачислится на промо-счёт.")
+            html = _wrap_html("Вам подарок 🎁", lines, cta=("Активировать сертификат", link))
+            await send_email(recipient_email, "Вам подарили сертификат 🎁",
+                             f"{buyer.full_name} дарит вам сертификат на {amount} ₽. Код: {cert.code}", html)
+        except Exception:  # noqa: BLE001
+            pass
     return cert
 
 

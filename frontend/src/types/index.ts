@@ -300,6 +300,9 @@ export interface Order {
   coupon_discount: string
   status: OrderStatus
   delivery_address: string
+  is_gift?: boolean
+  gift_wrap?: boolean
+  gift_message?: string
   items: OrderItem[]
   payment?: Payment
   delivery_info?: DeliveryInfo

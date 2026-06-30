@@ -200,6 +200,13 @@ async def update_profile(
     return current_user
 
 
+@users_router.get("/public-config")
+async def public_config(db: AsyncSession = Depends(get_db)):
+    """Whitelisted public settings the storefront needs (no auth)."""
+    from app.services.settings_service import get_setting
+    return {"gift_wrap_price": await get_setting(db, "gift_wrap_price")}
+
+
 @users_router.get("/unsubscribe")
 async def unsubscribe_from_marketing(token: str, db: AsyncSession = Depends(get_db)):
     """One-click marketing unsubscribe (HMAC-signed token from campaign emails)."""

@@ -813,6 +813,11 @@ class Order(Base):
     delivery_address: Mapped[str] = mapped_column(Text, nullable=False)
     coupon_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("coupon.id"), nullable=True)
     coupon_discount: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=Decimal("0.00"), nullable=False)
+    # Gift options: gift wrapping (paid, gift_wrap_price) + a card message for the
+    # recipient. The price (if wrapped) is added to the order total.
+    is_gift: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default="false")
+    gift_wrap: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default="false")
+    gift_message: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     # Currency snapshot: prices are stored in base currency (RUB); these record
     # what the buyer actually saw/paid in, for display and receipts.
     currency: Mapped[CurrencyCode] = mapped_column(Enum(CurrencyCode), default=CurrencyCode.RUB, nullable=False)
