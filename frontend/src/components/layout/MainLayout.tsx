@@ -51,6 +51,7 @@ export default function MainLayout() {
       key: 'grp-purchases', label: 'Покупки', icon: <ShoppingCartOutlined />,
       children: [
         { key: 'orders', label: <Link to="/orders">Мои заказы</Link> },
+        { key: 'custom-requests', label: <Link to="/custom-requests">Индивидуальные заказы</Link> },
         { key: 'downloads', label: <Link to="/my/downloads">Мои покупки</Link> },
         { key: 'learning', label: <Link to="/learning">Обучение</Link> },
         { key: 'returns', label: <Link to="/returns">Возвраты</Link> },
@@ -89,6 +90,7 @@ export default function MainLayout() {
             { key: 'seller', label: <Link to="/seller">Обзор</Link> },
             { key: 'seller-products', label: <Link to="/seller/products">Товары</Link> },
             { key: 'seller-orders', label: <Link to="/seller/orders">Заказы</Link> },
+            { key: 'seller-custom', label: <Link to="/seller/custom-requests">Запросы на изготовление</Link> },
             { key: 'seller-analytics', label: <Link to="/seller/analytics">Аналитика продаж</Link> },
             { key: 'seller-reviews', label: <Link to="/seller/reviews">Отзывы на товары</Link> },
             { key: 'seller-returns', label: <Link to="/seller/returns">Возвраты</Link> },

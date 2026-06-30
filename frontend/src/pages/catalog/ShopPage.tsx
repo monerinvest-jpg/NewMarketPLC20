@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
-import { useParams, Link } from 'react-router-dom'
-import { Row, Col, Card, Typography, Rate, Spin, Empty, Button, Tag, message, Progress, Space } from 'antd'
+import { useParams, Link, useNavigate } from 'react-router-dom'
+import { Row, Col, Card, Typography, Rate, Spin, Empty, Button, Tag, message, Progress, Space, Modal, Form, Input, InputNumber } from 'antd'
 import { FlagOutlined, ShopOutlined, CheckCircleFilled, HeartOutlined, HeartFilled } from '@ant-design/icons'
-import { shopsApi, productsApi, reviewsApi } from '@/api'
+import { shopsApi, productsApi, reviewsApi, customApi } from '@/api'
 import type { Shop, Product, ShopRatingSummary } from '@/types'
 import { useAuthStore } from '@/store/authStore'
 import ReportModal from '@/components/common/ReportModal'
@@ -12,6 +12,9 @@ const { Title, Text, Paragraph } = Typography
 export default function ShopPage() {
   const { id } = useParams<{ id: string }>()
   const { user } = useAuthStore()
+  const navigate = useNavigate()
+  const [customModalOpen, setCustomModalOpen] = useState(false)
+  const [customForm] = Form.useForm()
   const [shop, setShop] = useState<Shop | null>(null)
   const [products, setProducts] = useState<Product[]>([])
   const [summary, setSummary] = useState<ShopRatingSummary | null>(null)
@@ -105,6 +108,12 @@ export default function ShopPage() {
             >
               Пожаловаться
             </Button>
+            <Button type="primary" ghost onClick={() => {
+              if (!user) { message.info('Войдите, чтобы заказать изготовление'); return }
+              setCustomModalOpen(true)
+            }}>
+              ✨ Заказать своё
+            </Button>
           </Space>
         </div>
         {shop.description && (
@@ -185,6 +194,37 @@ export default function ShopPage() {
         targetId={shop.id}
         targetLabel={shop.name}
       />
+
+      <Modal
+        title={`Индивидуальный заказ · ${shop.name}`}
+        open={customModalOpen}
+        onCancel={() => setCustomModalOpen(false)}
+        okText="Отправить запрос"
+        onOk={async () => {
+          const v = await customForm.validateFields()
+          try {
+            await customApi.create({ shop_id: shop.id, title: v.title, description: v.description, budget: v.budget })
+            message.success('Запрос отправлен мастеру')
+            setCustomModalOpen(false); customForm.resetFields()
+            navigate('/custom-requests')
+          } catch (e: any) {
+            message.error(e.response?.data?.detail || 'Ошибка')
+          }
+        }}
+      >
+        <Paragraph type="secondary">Опишите, что хотите изготовить — мастер пришлёт оферту с ценой и сроком.</Paragraph>
+        <Form form={customForm} layout="vertical">
+          <Form.Item name="title" label="Что нужно изготовить" rules={[{ required: true }]}>
+            <Input placeholder="Напр.: деревянная шкатулка с гравировкой" />
+          </Form.Item>
+          <Form.Item name="description" label="Детали (размеры, материалы, пожелания)" rules={[{ required: true }]}>
+            <Input.TextArea rows={4} />
+          </Form.Item>
+          <Form.Item name="budget" label="Бюджет, ₽ (необязательно)">
+            <InputNumber min={0} style={{ width: '100%' }} />
+          </Form.Item>
+        </Form>
+      </Modal>
     </div>
   )
 }

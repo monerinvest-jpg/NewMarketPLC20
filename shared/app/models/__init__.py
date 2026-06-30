@@ -27,6 +27,7 @@ from app.models.models import (
     ShopMember, ShopMemberRole, SellerVerification, SellerVerificationStatus,
     Campaign, CampaignChannel, CampaignStatus, InstallmentPlan,
     AcademyCourse, AcademyLesson, AcademyProgress,
+    CustomRequest, CustomMessage, CustomRequestStatus,
 )
 
 __all__ = [
@@ -58,4 +59,5 @@ __all__ = [
     "ShopMember", "ShopMemberRole", "SellerVerification", "SellerVerificationStatus",
     "Campaign", "CampaignChannel", "CampaignStatus", "InstallmentPlan",
     "AcademyCourse", "AcademyLesson", "AcademyProgress",
+    "CustomRequest", "CustomMessage", "CustomRequestStatus",
 ]

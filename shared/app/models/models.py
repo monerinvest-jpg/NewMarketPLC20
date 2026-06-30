@@ -533,6 +533,66 @@ class AcademyProgress(Base):
     )
 
 
+# ─── Custom / made-to-order requests (Etsy-style commissions) ───────────────────
+
+class CustomRequestStatus(str, enum.Enum):
+    new = "new"                  # submitted, awaiting seller
+    quoted = "quoted"            # seller sent an offer
+    accepted = "accepted"        # buyer accepted the offer (agreement reached)
+    in_production = "in_production"
+    ready = "ready"              # finished, awaiting shipment/handover
+    completed = "completed"
+    declined = "declined"        # seller declined
+    cancelled = "cancelled"      # buyer cancelled
+
+
+class CustomRequest(Base):
+    """A buyer's made-to-order request to a shop, negotiated to a seller offer
+    (price / lead time / deposit) and tracked through production to completion."""
+    __tablename__ = "custom_request"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    buyer_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("user.id"), nullable=False)
+    shop_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("shop.id"), nullable=False)
+    product_id: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("product.id"), nullable=True)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+    budget: Mapped[Optional[Decimal]] = mapped_column(Numeric(12, 2), nullable=True)
+    deadline: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    attachments: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # JSON list of image URLs
+    status: Mapped[CustomRequestStatus] = mapped_column(
+        Enum(CustomRequestStatus), default=CustomRequestStatus.new, nullable=False)
+    # Current seller offer
+    quoted_price: Mapped[Optional[Decimal]] = mapped_column(Numeric(12, 2), nullable=True)
+    quoted_days: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    deposit_percent: Mapped[Optional[Decimal]] = mapped_column(Numeric(5, 2), nullable=True)
+    offer_note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False)
+
+    messages: Mapped[List["CustomMessage"]] = relationship(
+        "CustomMessage", back_populates="request", cascade="all, delete-orphan", order_by="CustomMessage.created_at"
+    )
+
+    __table_args__ = (
+        Index("ix_custom_request_buyer", "buyer_id"),
+        Index("ix_custom_request_shop", "shop_id"),
+    )
+
+
+class CustomMessage(Base):
+    __tablename__ = "custom_message"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    request_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("custom_request.id"), nullable=False)
+    sender_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("user.id"), nullable=False)
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+    attachments: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # JSON list of URLs
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+
+    request: Mapped["CustomRequest"] = relationship("CustomRequest", back_populates="messages")
+
+
 class Category(Base):
     __tablename__ = "category"
 

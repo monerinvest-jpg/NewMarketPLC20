@@ -103,6 +103,8 @@ const AdminVerifications = lazy(() => import('./pages/admin/AdminVerifications')
 const AdminCampaigns = lazy(() => import('./pages/admin/AdminCampaigns'))
 const AdminAcademy = lazy(() => import('./pages/admin/AdminAcademy'))
 const SellerAcademy = lazy(() => import('./pages/seller/SellerAcademy'))
+const CustomRequestsPage = lazy(() => import('./pages/buyer/CustomRequestsPage'))
+const SellerCustomRequests = lazy(() => import('./pages/seller/SellerCustomRequests'))
 
 // Craft / wood theme: warm amber-terracotta accents on parchment, walnut text,
 // softer radii. Evokes handmade goods rather than a cold marketplace.
@@ -170,6 +172,7 @@ function App() {
                 <Route path="/favorites" element={<FavoritesPage />} />
                 <Route path="/profile" element={<ProfilePage />} />
                 <Route path="/referral" element={<ReferralPage />} />
+                <Route path="/custom-requests" element={<CustomRequestsPage />} />
                 <Route path="/chat" element={<ChatPage />} />
                 <Route path="/returns" element={<ReturnsPage />} />
                 <Route path="/security" element={<TwoFactorPage />} />
@@ -214,6 +217,7 @@ function App() {
                 <Route path="/seller/staff" element={<SellerStaff />} />
                 <Route path="/seller/trust" element={<SellerTrust />} />
                 <Route path="/seller/academy" element={<SellerAcademy />} />
+                <Route path="/seller/custom-requests" element={<SellerCustomRequests />} />
               </Route>
             </Route>
 

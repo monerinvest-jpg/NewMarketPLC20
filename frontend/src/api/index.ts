@@ -852,6 +852,28 @@ export const disputesApi = {
     api.post<Dispute>(`/disputes/${id}/resolve`, data).then(r => r.data),
 }
 
+// ─── Custom / made-to-order requests ───────────────────────────────────────
+export const customApi = {
+  // buyer
+  create: (data: any) => api.post<any>('/orders/custom-requests', data).then(r => r.data),
+  mine: () => api.get<any[]>('/orders/custom-requests').then(r => r.data),
+  get: (id: number) => api.get<any>(`/orders/custom-requests/${id}`).then(r => r.data),
+  message: (id: number, text: string, attachments: string[] = []) =>
+    api.post(`/orders/custom-requests/${id}/message`, { text, attachments }).then(r => r.data),
+  accept: (id: number) => api.post(`/orders/custom-requests/${id}/accept`).then(r => r.data),
+  cancel: (id: number) => api.post(`/orders/custom-requests/${id}/cancel`).then(r => r.data),
+}
+export const sellerCustomApi = {
+  list: () => api.get<any[]>('/seller/custom-requests').then(r => r.data),
+  get: (id: number) => api.get<any>(`/seller/custom-requests/${id}`).then(r => r.data),
+  message: (id: number, text: string, attachments: string[] = []) =>
+    api.post(`/seller/custom-requests/${id}/message`, { text, attachments }).then(r => r.data),
+  offer: (id: number, data: { price: number; days?: number; deposit_percent?: number; note?: string }) =>
+    api.post(`/seller/custom-requests/${id}/offer`, data).then(r => r.data),
+  status: (id: number, status: string) => api.post(`/seller/custom-requests/${id}/status`, { status }).then(r => r.data),
+  decline: (id: number, reason?: string) => api.post(`/seller/custom-requests/${id}/decline`, { reason }).then(r => r.data),
+}
+
 // ─── Seller Academy (seller-facing) ────────────────────────────────────────
 export const academyApi = {
   courses: () => api.get<any[]>('/seller/academy/courses').then(r => r.data),

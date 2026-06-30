@@ -13,6 +13,7 @@ from app.api.v1.endpoints.disputes import router as disputes_router
 from app.api.v1.endpoints.buyer_extra import router as buyer_extra_router
 from app.api.v1.endpoints.digital_library import router as library_router
 from app.api.v1.endpoints.misc import delivery_router
+from app.api.v1.endpoints.custom_orders import buyer_router as custom_buyer_router
 
 app = create_service_app(
     "orders",
@@ -24,5 +25,6 @@ app = create_service_app(
         buyer_extra_router,
         library_router,
         delivery_router,
+        custom_buyer_router,
     ],
 )
