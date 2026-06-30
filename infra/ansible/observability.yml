@@ -41,6 +41,7 @@
         - "{{ obs_dir }}"
         - "{{ obs_dir }}/grafana/provisioning/datasources"
         - "{{ obs_dir }}/grafana/provisioning/dashboards"
+        - "{{ obs_dir }}/grafana/provisioning/dashboards/json"
 
     - name: Prometheus config (scrape backend services, kong, node exporters)
       copy:
@@ -78,10 +79,31 @@
           apiVersion: 1
           datasources:
             - name: Prometheus
+              uid: prometheus
               type: prometheus
               access: proxy
               url: http://prometheus:9090
               isDefault: true
+
+    - name: Grafana dashboard provider provisioning
+      copy:
+        dest: "{{ obs_dir }}/grafana/provisioning/dashboards/provider.yml"
+        content: |
+          apiVersion: 1
+          providers:
+            - name: marketplace
+              type: file
+              disableDeletion: false
+              allowUiUpdates: true
+              options:
+                path: /etc/grafana/provisioning/dashboards/json
+                foldersFromFilesStructure: false
+
+    - name: Ship the marketplace dashboard JSON
+      copy:
+        src: files/grafana-marketplace.json
+        dest: "{{ obs_dir }}/grafana/provisioning/dashboards/json/marketplace.json"
+        mode: "0644"
 
     - name: Prometheus container
       shell: >

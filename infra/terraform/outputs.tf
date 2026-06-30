@@ -58,6 +58,13 @@ ${join("\n", [for ip in yandex_compute_instance_group.kong.instances[*].network_
 [backend]
 ${join("\n", [for ip in yandex_compute_instance_group.backend.instances[*].network_interface[0].ip_address : "${ip} ansible_user=ubuntu"])}
 
+# Observability host = the bastion (public IP, in-VPC) — runs Prometheus+Grafana.
+[monitoring]
+${yandex_compute_instance.bastion.network_interface[0].nat_ip_address} ansible_user=ubuntu
+
+[monitoring:vars]
+ansible_ssh_common_args='-o StrictHostKeyChecking=no'
+
 [all:vars]
 postgres_host=${yandex_mdb_postgresql_cluster.main.host[0].fqdn}
 postgres_password=${random_password.postgres_password.result}
