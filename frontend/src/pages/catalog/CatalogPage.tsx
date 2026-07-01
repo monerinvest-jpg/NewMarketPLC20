@@ -8,6 +8,7 @@ import { FilterOutlined } from '@ant-design/icons'
 import { productsApi, categoriesApi, facetsApi } from '@/api'
 import type { Product, Category, CatalogFacet } from '@/types'
 import ProductCard, { ProductGridSkeleton } from '@/components/common/ProductCard'
+import Seo from '@/components/common/Seo'
 
 const { Title, Text } = Typography
 
@@ -137,8 +138,16 @@ export default function CatalogPage() {
     </>
   )
 
+  const categoryName = categoryId
+    ? categories.find((c) => String(c.id) === categoryId)?.name
+    : undefined
+
   return (
     <Row gutter={24}>
+      <Seo
+        title={q ? `Поиск: ${q}` : categoryName || 'Каталог'}
+        description={categoryName ? `${categoryName} — купить изделия ручной работы на маркетплейсе.` : undefined}
+      />
       {/* Filters — desktop sidebar (hidden on mobile in favour of the drawer) */}
       <Col xs={0} md={6}>
         <Card title="Фильтры" size="small" style={{ marginBottom: 16 }}>

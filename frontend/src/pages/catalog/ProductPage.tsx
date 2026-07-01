@@ -18,6 +18,7 @@ import { useCartStore } from '@/store/cartStore'
 import { useAuthStore } from '@/store/authStore'
 import { useCompareStore } from '@/store/compareStore'
 import ReportModal from '@/components/common/ReportModal'
+import Seo from '@/components/common/Seo'
 import dayjs from 'dayjs'
 
 const { Title, Text, Paragraph } = Typography
@@ -226,6 +227,12 @@ export default function ProductPage() {
 
   return (
     <div>
+      <Seo
+        title={product.title}
+        description={product.description}
+        image={(product.images.find((i) => i.is_main) || product.images[0])?.url}
+        type="product"
+      />
       <Row gutter={32}>
         <Col xs={24} md={10}>
           <Image src={selectedImage} alt={product.title} style={{ width: '100%', borderRadius: 12 }} />

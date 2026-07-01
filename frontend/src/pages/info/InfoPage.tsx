@@ -1,5 +1,6 @@
 import { useParams, Link, Navigate } from 'react-router-dom'
 import { Typography, Collapse, Card, Alert } from 'antd'
+import Seo from '@/components/common/Seo'
 
 const { Title, Paragraph, Text } = Typography
 
@@ -294,6 +295,7 @@ export default function InfoPage() {
   if (!page) return <Navigate to="/" replace />
   return (
     <div style={{ maxWidth: 860, margin: '0 auto' }}>
+      <Seo title={page.title} />
       <Title level={2}>{page.title}</Title>
       {page.content}
     </div>

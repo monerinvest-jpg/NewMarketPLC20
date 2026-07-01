@@ -6,6 +6,7 @@ import { productsApi, categoriesApi, homeApi } from '@/api'
 import type { Product, Category } from '@/types'
 import { useAuthStore } from '@/store/authStore'
 import ProductCard, { ProductGridSkeleton } from '@/components/common/ProductCard'
+import Seo from '@/components/common/Seo'
 
 const { Title, Text } = Typography
 
@@ -53,6 +54,7 @@ export default function HomePage() {
 
   return (
     <div>
+      <Seo />
       {/* Admin-managed promotional banners */}
       {banners.length > 0 && (
         <div style={{ display: 'flex', gap: 16, overflowX: 'auto', marginBottom: 24 }}>

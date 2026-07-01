@@ -6,6 +6,7 @@ import { shopsApi, productsApi, reviewsApi, customApi } from '@/api'
 import type { Shop, Product, ShopRatingSummary } from '@/types'
 import { useAuthStore } from '@/store/authStore'
 import ReportModal from '@/components/common/ReportModal'
+import Seo from '@/components/common/Seo'
 
 const { Title, Text, Paragraph } = Typography
 
@@ -53,6 +54,7 @@ export default function ShopPage() {
 
   return (
     <div>
+      <Seo title={shop.name} description={shop.description} image={shop.logo_url || undefined} />
       {shop.banner_url && (
         <div style={{
           height: 180, borderRadius: 12, marginBottom: 16, overflow: 'hidden',
