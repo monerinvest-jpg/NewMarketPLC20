@@ -30,7 +30,8 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 @router.post("/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
-async def register(payload: UserCreate, db: AsyncSession = Depends(get_db)):
+@limiter.limit("5/minute")
+async def register(request: Request, payload: UserCreate, db: AsyncSession = Depends(get_db)):
     """Register a new user. Optionally accepts a referral code."""
     result = await db.execute(select(User).where(User.email == payload.email))
     if result.scalar_one_or_none():
@@ -65,8 +66,10 @@ async def register(payload: UserCreate, db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/verify-email")
-async def verify_email(payload: VerifyCodeRequest, db: AsyncSession = Depends(get_db)):
-    """Confirm a registration email with the code that was sent."""
+@limiter.limit("10/minute")
+async def verify_email(request: Request, payload: VerifyCodeRequest, db: AsyncSession = Depends(get_db)):
+    """Confirm a registration email with the code that was sent (rate-limited
+    against 6-digit code brute force)."""
     user = (await db.execute(select(User).where(User.email == payload.email))).scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=404, detail="Пользователь не найден")
@@ -127,12 +130,14 @@ async def send_phone_code(
 
 
 @router.post("/verify-phone")
+@limiter.limit("10/minute")
 async def verify_phone(
+    request: Request,
     payload: VerifyPhoneRequest,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Confirm the user's phone with the SMS code."""
+    """Confirm the user's phone with the SMS code (rate-limited against brute force)."""
     ok, error = await verify_code(db, current_user, VerificationPurpose.phone, payload.code)
     await db.commit()
     if not ok:
@@ -234,7 +239,8 @@ async def forgot_password(request: Request, payload: PasswordResetRequest, db: A
 
 
 @router.post("/reset-password", status_code=status.HTTP_200_OK)
-async def reset_password(payload: PasswordResetConfirm, db: AsyncSession = Depends(get_db)):
+@limiter.limit("5/minute")
+async def reset_password(request: Request, payload: PasswordResetConfirm, db: AsyncSession = Depends(get_db)):
     result = await db.execute(
         select(PasswordResetToken).where(PasswordResetToken.token == payload.token)
     )
