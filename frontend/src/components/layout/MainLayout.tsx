@@ -1,9 +1,9 @@
 import { Outlet, Link, useNavigate } from 'react-router-dom'
-import { Layout, Menu, Button, Input, Badge, Avatar, Dropdown, Space, Select } from 'antd'
+import { Layout, Menu, Button, Input, Badge, Avatar, Dropdown, Space, Select, Drawer, Grid } from 'antd'
 import {
   ShoppingCartOutlined, UserOutlined,
   ShopOutlined, MessageOutlined, LogoutOutlined, HeartOutlined, SwapOutlined,
-  CustomerServiceOutlined, GiftOutlined, SettingOutlined,
+  CustomerServiceOutlined, GiftOutlined, SettingOutlined, MenuOutlined, LoginOutlined,
 } from '@ant-design/icons'
 import NotificationBell from '@/components/common/NotificationBell'
 import { useCompareStore } from '@/store/compareStore'
@@ -13,7 +13,6 @@ import { useAuthStore } from '@/store/authStore'
 import { useCartStore } from '@/store/cartStore'
 import { sellerOrigin } from '@/lib/sellerHost'
 import { useEffect, useState } from 'react'
-import { useNavigate as useNav } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 
 const { Header, Content, Footer } = Layout
@@ -26,6 +25,11 @@ export default function MainLayout() {
   const navigate = useNavigate()
   const { t, i18n } = useTranslation()
   const [searchQuery, setSearchQuery] = useState('')
+  // md === false only after the breakpoint hook resolves — avoids a mobile-menu
+  // flash on desktop during the very first render (screens starts as {}).
+  const screens = Grid.useBreakpoint()
+  const isMobile = screens.md === false
+  const [menuOpen, setMenuOpen] = useState(false)
 
   useEffect(() => {
     if (user) fetchCart()
@@ -126,24 +130,58 @@ export default function MainLayout() {
       >
         <div
           className="page-container"
-          style={{ display: 'flex', alignItems: 'center', gap: 16, minHeight: 64, flexWrap: 'wrap' }}
+          style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 10 : 16, minHeight: 64, flexWrap: 'wrap', paddingTop: isMobile ? 8 : 0, paddingBottom: isMobile ? 8 : 0 }}
         >
+        {/* Mobile: burger opens the navigation drawer */}
+        {isMobile && (
+          <Button
+            type="text"
+            aria-label="Меню"
+            icon={<MenuOutlined style={{ fontSize: 20 }} />}
+            onClick={() => setMenuOpen(true)}
+          />
+        )}
+
         {/* Logo */}
-        <Link to="/" style={{ fontSize: 22, fontWeight: 700, color: '#b45309', whiteSpace: 'nowrap' }}>
+        <Link to="/" style={{ fontSize: isMobile ? 18 : 22, fontWeight: 700, color: '#b45309', whiteSpace: 'nowrap' }}>
           🪵 Маркетплейс
         </Link>
 
-        {/* Search */}
+        {/* Mobile: only the essentials stay in the bar — cart + account entry */}
+        {isMobile && (
+          <Space size={4} style={{ marginLeft: 'auto' }}>
+            {user && <NotificationBell />}
+            <Link to="/cart" aria-label="Корзина">
+              <Badge count={user ? totalItems() : 0} size="small">
+                <Button type="text" icon={<ShoppingCartOutlined style={{ fontSize: 20 }} />} />
+              </Badge>
+            </Link>
+            {user ? (
+              <Dropdown menu={{ items: userMenuItems }} placement="bottomRight">
+                <Avatar size="small" style={{ background: '#f97316', cursor: 'pointer' }}>
+                  {user.full_name[0]?.toUpperCase()}
+                </Avatar>
+              </Dropdown>
+            ) : (
+              <Link to="/login" aria-label="Войти">
+                <Button type="text" icon={<LoginOutlined style={{ fontSize: 18 }} />} />
+              </Link>
+            )}
+          </Space>
+        )}
+
+        {/* Search — on mobile drops to its own full-width second row */}
         <Input.Search
           placeholder={t('header.search')}
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           onSearch={handleSearch}
-          style={{ flex: 1, minWidth: 180, maxWidth: 600 }}
-          size="large"
+          style={isMobile ? { flexBasis: '100%', order: 2 } : { flex: 1, minWidth: 180, maxWidth: 600 }}
+          size={isMobile ? 'middle' : 'large'}
         />
 
-        {/* Nav */}
+        {/* Desktop nav */}
+        {!isMobile && (
         <Space size={8}>
           <Link to="/catalog">
             <Button type="text">{t('nav.catalog')}</Button>
@@ -192,8 +230,62 @@ export default function MainLayout() {
             </>
           )}
         </Space>
+        )}
         </div>
       </Header>
+
+      {/* Mobile navigation drawer */}
+      <Drawer
+        title="🪵 Маркетплейс"
+        placement="left"
+        open={menuOpen}
+        onClose={() => setMenuOpen(false)}
+        width={300}
+        styles={{ body: { padding: 0 } }}
+      >
+        <div style={{ display: 'flex', gap: 8, padding: '12px 16px', borderBottom: '1px solid #f0f0f0' }}>
+          <Select
+            value={i18n.language?.startsWith('en') ? 'en' : 'ru'}
+            onChange={(lng) => i18n.changeLanguage(lng)}
+            size="small" style={{ width: 88 }}
+            options={[{ value: 'ru', label: '🇷🇺 RU' }, { value: 'en', label: '🇬🇧 EN' }]}
+          />
+          {user && (
+            <Select
+              value={currentCurrency}
+              onChange={setCurrent}
+              size="small"
+              style={{ width: 92 }}
+              options={rates.map((r) => ({ value: r.code, label: `${r.symbol} ${r.code}` }))}
+            />
+          )}
+        </div>
+        <Menu
+          mode="inline"
+          selectable={false}
+          onClick={() => setMenuOpen(false)}
+          style={{ borderInlineEnd: 'none' }}
+          items={[
+            { key: 'catalog', label: <Link to="/catalog">{t('nav.catalog')}</Link>, icon: <ShopOutlined /> },
+            ...(user
+              ? [
+                  { key: 'chat', label: <Link to="/chat">Сообщения</Link>, icon: <MessageOutlined /> },
+                  {
+                    key: 'compare',
+                    label: <Link to="/compare">Сравнение{compareCount ? ` (${compareCount})` : ''}</Link>,
+                    icon: <SwapOutlined />,
+                  },
+                  { type: 'divider' as const },
+                  ...userMenuItems,
+                ]
+              : [
+                  { type: 'divider' as const },
+                  { key: 'login', label: <Link to="/login">{t('nav.login')}</Link>, icon: <LoginOutlined /> },
+                  { key: 'register', label: <Link to="/register">{t('nav.register')}</Link>, icon: <UserOutlined /> },
+                ]),
+          ]}
+        />
+      </Drawer>
 
       <Content className="page-container" style={{ paddingTop: 24, paddingBottom: 40 }}>
         <Outlet />

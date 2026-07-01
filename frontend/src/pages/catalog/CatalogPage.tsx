@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react'
 import { Link, useSearchParams, useNavigate } from 'react-router-dom'
 import {
   Row, Col, Card, Slider, Select, Input, Pagination,
-  Typography, Button, Spin, Empty, Rate
+  Typography, Button, Spin, Empty, Rate, Drawer, Grid, Badge
 } from 'antd'
-import { ShoppingCartOutlined, SwapOutlined } from '@ant-design/icons'
+import { ShoppingCartOutlined, SwapOutlined, FilterOutlined } from '@ant-design/icons'
 import { productsApi, categoriesApi, facetsApi } from '@/api'
 import type { Product, Category, CatalogFacet } from '@/types'
 import { useCartStore } from '@/store/cartStore'
@@ -31,6 +31,14 @@ export default function CatalogPage() {
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 100000])
   const [facets, setFacets] = useState<CatalogFacet[]>([])
   const [selectedAttrs, setSelectedAttrs] = useState<Record<number, string>>({})
+  // Mobile: the filter sidebar collapses into a drawer behind a "Фильтры" button.
+  const screens = Grid.useBreakpoint()
+  const isMobile = screens.md === false
+  const [filtersOpen, setFiltersOpen] = useState(false)
+  const activeFilterCount =
+    (categoryId ? 1 : 0) +
+    (priceRange[0] > 0 || priceRange[1] < 100000 ? 1 : 0) +
+    Object.values(selectedAttrs).filter(Boolean).length
 
   useEffect(() => {
     categoriesApi.list().then(setCategories)
@@ -81,11 +89,9 @@ export default function CatalogPage() {
     }
   }
 
-  return (
-    <Row gutter={24}>
-      {/* Filters sidebar */}
-      <Col xs={24} md={6}>
-        <Card title="Фильтры" size="small" style={{ marginBottom: 16 }}>
+  // Shared filter controls — desktop sidebar Card and the mobile Drawer render the same content.
+  const filtersContent = (
+    <>
           <div style={{ marginBottom: 16 }}>
             <Text strong>Категория</Text>
             <Select
@@ -141,21 +147,52 @@ export default function CatalogPage() {
               ]}
             />
           </div>
+    </>
+  )
+
+  return (
+    <Row gutter={24}>
+      {/* Filters — desktop sidebar (hidden on mobile in favour of the drawer) */}
+      <Col xs={0} md={6}>
+        <Card title="Фильтры" size="small" style={{ marginBottom: 16 }}>
+          {filtersContent}
         </Card>
       </Col>
 
+      {/* Mobile filters drawer */}
+      <Drawer
+        title="Фильтры"
+        placement="left"
+        open={filtersOpen}
+        onClose={() => setFiltersOpen(false)}
+        width={300}
+      >
+        {filtersContent}
+        <Button type="primary" block style={{ marginTop: 8 }} onClick={() => setFiltersOpen(false)}>
+          Показать ({total})
+        </Button>
+      </Drawer>
+
       {/* Products grid */}
       <Col xs={24} md={18}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
           <Title level={4} style={{ margin: 0 }}>
             {q ? `Результаты поиска: "${q}"` : 'Все товары'} ({total})
           </Title>
-          <Input.Search
-            placeholder="Поиск..."
-            defaultValue={q}
-            onSearch={(v) => setParam('q', v)}
-            style={{ width: 260 }}
-          />
+          {isMobile ? (
+            <Badge count={activeFilterCount} size="small">
+              <Button icon={<FilterOutlined />} onClick={() => setFiltersOpen(true)}>
+                Фильтры
+              </Button>
+            </Badge>
+          ) : (
+            <Input.Search
+              placeholder="Поиск..."
+              defaultValue={q}
+              onSearch={(v) => setParam('q', v)}
+              style={{ width: 260 }}
+            />
+          )}
         </div>
 
         {loading ? (
@@ -168,7 +205,7 @@ export default function CatalogPage() {
               {products.map((p) => {
                 const img = p.images.find((i) => i.is_main) || p.images[0]
                 return (
-                  <Col key={p.id} xs={24} sm={12} lg={8}>
+                  <Col key={p.id} xs={12} sm={12} lg={8}>
                     <Link to={`/products/${p.id}`}>
                       <Card
                         hoverable className="product-card" style={{ position: 'relative' }}
