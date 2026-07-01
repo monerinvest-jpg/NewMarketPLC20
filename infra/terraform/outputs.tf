@@ -88,6 +88,8 @@ postgres_database=${var.project_name}_${var.environment}
 redis_host=${yandex_mdb_redis_cluster.cache.host[0].fqdn}
 redis_password=${random_password.redis_password.result}
 kong_password=${random_password.kong_password.result}
+# Bastion PRIVATE IP — the Loki endpoint that Alloy agents push to (observability.yml).
+monitoring_host=${yandex_compute_instance.bastion.network_interface[0].ip_address}
 s3_endpoint=https://storage.yandexcloud.net
 s3_bucket=${yandex_storage_bucket.assets.bucket}
 s3_private_bucket=${yandex_storage_bucket.private.bucket}

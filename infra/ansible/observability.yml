@@ -1,12 +1,17 @@
-# Observability stack: Prometheus + Grafana + node_exporter.
+# Observability stack: Prometheus + Grafana + Loki + Alloy + node_exporter.
 #
-# Scrapes /metrics from every backend microservice (ports 8001-8005, exposed by
-# prometheus-fastapi-instrumentator), the Kong Prometheus plugin, and node
-# exporters. Grafana runs with anonymous read-only access so its dashboards can
-# be embedded in admin → Метрики via an <iframe> (kiosk URL).
+# METRICS: Prometheus scrapes /metrics from every backend microservice (ports
+# 8001-8005, prometheus-fastapi-instrumentator), the Kong Prometheus plugin, and
+# node exporters. LOGS: Grafana Alloy runs on every node (backend/kong/monitoring),
+# tails all local Docker container logs off the docker socket and ships them to
+# Loki on the monitoring host (published on its PRIVATE IP only). Grafana has both
+# Prometheus (uid=prometheus) and Loki (uid=loki) datasources + dashboards
+# "Marketplace" (metrics) and "Логи (Loki)". Grafana runs with anonymous read-only
+# access so dashboards embed in admin → Метрики via an <iframe> (kiosk URL).
 #
 # Inventory: a `[monitoring]` host (a small VM or the bastion) plus the existing
-# `[backend]` and `[kong]` groups. Run AFTER deploy-services.yml.
+# `[backend]` and `[kong]` groups, and `monitoring_host` in [all:vars] = the Loki
+# host (bastion private IP; Terraform-generated). Run AFTER deploy-services.yml.
 #   ansible-playbook -i hosts.ini observability.yml
 ---
 - name: node_exporter on backend + kong nodes
@@ -25,7 +30,29 @@
         quay.io/prometheus/node-exporter:latest --path.rootfs=/host
       changed_when: false
 
-- name: Prometheus + Grafana
+    - name: Ensure /etc/alloy exists
+      file: { path: /etc/alloy, state: directory, mode: "0755" }
+
+    - name: Render Alloy config (tail docker logs -> Loki on monitoring host)
+      template:
+        src: templates/alloy.alloy.j2
+        dest: /etc/alloy/config.alloy
+        mode: "0644"
+      register: _alloy_cfg
+
+    - name: Run Grafana Alloy (log collector)
+      shell: >
+        docker rm -f alloy 2>/dev/null || true;
+        docker run -d --name alloy --restart always --user root
+        -v /etc/alloy/config.alloy:/etc/alloy/config.alloy:ro
+        -v /var/run/docker.sock:/var/run/docker.sock:ro
+        -v alloy-data:/var/lib/alloy/data
+        grafana/alloy:latest
+        run --server.http.listen-addr=0.0.0.0:12345
+        --storage.path=/var/lib/alloy/data /etc/alloy/config.alloy
+      changed_when: false
+
+- name: Prometheus + Grafana + Loki
   hosts: monitoring
   become: true
   vars:
@@ -45,6 +72,8 @@
         - "{{ obs_dir }}/grafana/provisioning/datasources"
         - "{{ obs_dir }}/grafana/provisioning/dashboards"
         - "{{ obs_dir }}/grafana/provisioning/dashboards/json"
+        - "{{ obs_dir }}/loki"
+        - /etc/alloy
 
     - name: Prometheus config (scrape backend services, kong, node exporters)
       copy:
@@ -88,6 +117,18 @@
               url: http://prometheus:9090
               isDefault: true
 
+    - name: Grafana datasource provisioning (Loki)
+      copy:
+        dest: "{{ obs_dir }}/grafana/provisioning/datasources/loki.yml"
+        content: |
+          apiVersion: 1
+          datasources:
+            - name: Loki
+              uid: loki
+              type: loki
+              access: proxy
+              url: http://loki:3100
+
     - name: Grafana dashboard provider provisioning
       copy:
         dest: "{{ obs_dir }}/grafana/provisioning/dashboards/provider.yml"
@@ -108,6 +149,18 @@
         dest: "{{ obs_dir }}/grafana/provisioning/dashboards/json/marketplace.json"
         mode: "0644"
 
+    - name: Ship the logs dashboard JSON
+      copy:
+        src: files/grafana-logs.json
+        dest: "{{ obs_dir }}/grafana/provisioning/dashboards/json/logs.json"
+        mode: "0644"
+
+    - name: Loki config
+      copy:
+        src: files/loki-config.yml
+        dest: "{{ obs_dir }}/loki/loki-config.yml"
+        mode: "0644"
+
     - name: Prometheus container
       shell: >
         docker rm -f prometheus 2>/dev/null || true;
@@ -117,11 +170,21 @@
         prom/prometheus:latest
       changed_when: false
 
+    - name: Loki container (log store; published only on the private IP)
+      shell: >
+        docker rm -f loki 2>/dev/null || true;
+        docker run -d --name loki --restart always
+        -p {{ monitoring_host }}:3100:3100
+        -v {{ obs_dir }}/loki/loki-config.yml:/etc/loki/local-config.yaml:ro
+        -v loki-data:/loki
+        grafana/loki:latest -config.file=/etc/loki/local-config.yaml
+      changed_when: false
+
     - name: Grafana container (anonymous viewer for iframe embedding)
       shell: >
         docker rm -f grafana 2>/dev/null || true;
         docker run -d --name grafana --restart always
-        -p 3000:3000 --link prometheus:prometheus
+        -p 3000:3000 --link prometheus:prometheus --link loki:loki
         -e GF_SECURITY_ADMIN_PASSWORD={{ grafana_pw | quote }}
         -e GF_AUTH_ANONYMOUS_ENABLED=true
         -e GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
@@ -129,4 +192,22 @@
         -e GF_USERS_DEFAULT_THEME=light
         -v {{ obs_dir }}/grafana/provisioning:/etc/grafana/provisioning:ro
         grafana/grafana:latest
+      changed_when: false
+
+    - name: Render Alloy config on the monitoring host (collect its own infra logs)
+      template:
+        src: templates/alloy.alloy.j2
+        dest: /etc/alloy/config.alloy
+        mode: "0644"
+
+    - name: Run Grafana Alloy on the monitoring host
+      shell: >
+        docker rm -f alloy 2>/dev/null || true;
+        docker run -d --name alloy --restart always --user root
+        -v /etc/alloy/config.alloy:/etc/alloy/config.alloy:ro
+        -v /var/run/docker.sock:/var/run/docker.sock:ro
+        -v alloy-data:/var/lib/alloy/data
+        grafana/alloy:latest
+        run --server.http.listen-addr=0.0.0.0:12345
+        --storage.path=/var/lib/alloy/data /etc/alloy/config.alloy
       changed_when: false

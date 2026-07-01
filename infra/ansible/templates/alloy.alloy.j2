@@ -1,0 +1,38 @@
+// Grafana Alloy — tail every local Docker container's logs and ship them to Loki.
+// Rendered per-node by Ansible: monitoring_host = the Loki host (bastion private IP),
+// inventory_hostname = this node (added as a `node` label on every log line).
+
+// Discover all containers on the local Docker daemon.
+discovery.docker "containers" {
+	host = "unix:///var/run/docker.sock"
+}
+
+// Turn the container name (e.g. "/handmade-catalog") into a clean `container` label.
+discovery.relabel "docker" {
+	targets = discovery.docker.containers.targets
+
+	rule {
+		source_labels = ["__meta_docker_container_name"]
+		regex         = "/(.*)"
+		target_label  = "container"
+	}
+}
+
+// Read the container log streams and forward them to loki.write.
+loki.source.docker "containers" {
+	host          = "unix:///var/run/docker.sock"
+	targets       = discovery.docker.containers.targets
+	relabel_rules = discovery.relabel.docker.rules
+	forward_to    = [loki.write.default.receiver]
+}
+
+// Push to Loki on the monitoring host.
+loki.write "default" {
+	endpoint {
+		url = "http://{{ monitoring_host }}:3100/loki/api/v1/push"
+	}
+	external_labels = {
+		node = "{{ inventory_hostname }}",
+		job  = "docker",
+	}
+}

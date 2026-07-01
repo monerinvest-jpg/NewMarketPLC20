@@ -1,0 +1,51 @@
+{
+  "uid": "logs",
+  "title": "Логи (Loki)",
+  "tags": ["marketplace", "logs"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-1h", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "container",
+        "label": "Контейнер",
+        "type": "query",
+        "datasource": { "type": "loki", "uid": "loki" },
+        "query": "label_values(container)",
+        "refresh": 2,
+        "includeAll": true,
+        "allValue": ".+",
+        "multi": true,
+        "current": { "text": ["All"], "value": ["$__all"] }
+      }
+    ]
+  },
+  "annotations": { "list": [] },
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Строк логов/сек по контейнерам",
+      "gridPos": { "h": 7, "w": 24, "x": 0, "y": 0 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "fieldConfig": { "defaults": { "unit": "logs", "custom": { "drawStyle": "bars", "fillOpacity": 40, "stacking": { "mode": "normal" } } }, "overrides": [] },
+      "targets": [
+        { "expr": "sum by (container) (rate({job=\"docker\", container=~\"$container\"}[1m]))", "legendFormat": "{{container}}", "refId": "A", "datasource": { "type": "loki", "uid": "loki" } }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "logs",
+      "title": "Логи контейнеров",
+      "gridPos": { "h": 20, "w": 24, "x": 0, "y": 7 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "options": { "showTime": true, "showLabels": false, "wrapLogMessage": true, "enableLogDetails": true, "sortOrder": "Descending", "dedupStrategy": "none", "prettifyLogMessage": false },
+      "targets": [
+        { "expr": "{job=\"docker\", container=~\"$container\"}", "refId": "A", "datasource": { "type": "loki", "uid": "loki" } }
+      ]
+    }
+  ]
+}
