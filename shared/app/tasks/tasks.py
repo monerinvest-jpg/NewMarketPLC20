@@ -261,6 +261,13 @@ def rebuild_recommendations():
     return asyncio.run(_rebuild_recommendations_async())
 
 
+@celery_app.task(name="app.tasks.tasks.rebuild_search_index")
+def rebuild_search_index():
+    """Full rebuild of the MeiliSearch products index (no-op without Meili)."""
+    from app.services.search_service import reindex_all_products
+    return asyncio.run(reindex_all_products())
+
+
 async def _settle_promotions_async():
     from app.services import promotion_service
 

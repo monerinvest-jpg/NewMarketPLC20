@@ -80,6 +80,13 @@ export const productsApi = {
 
   get: (id: number) => api.get<Product>(`/products/${id}`).then(r => r.data),
 
+  suggest: (q: string) =>
+    api.get<{
+      products: { id: number; title: string; price: string; image_url: string | null }[]
+      categories: { id: number; name: string }[]
+      shops: { id: number; name: string }[]
+    }>('/products/suggest', { params: { q } }).then(r => r.data),
+
   importCsv: (file: File) => {
     const fd = new FormData()
     fd.append('file', file)

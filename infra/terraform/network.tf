@@ -120,6 +120,15 @@ resource "yandex_vpc_security_group" "backend" {
     v4_cidr_blocks = ["0.0.0.0/0"]
   }
 
+  # MeiliSearch on the first backend node; reachable from the private subnets
+  # only (service containers on the OTHER backend node must query it too).
+  ingress {
+    description    = "MeiliSearch (in-VPC only)"
+    protocol       = "TCP"
+    port           = 7700
+    v4_cidr_blocks = [var.private_cidr, "192.168.20.0/24"]
+  }
+
   egress {
     description    = "Allow all outgoing"
     protocol       = "ANY"

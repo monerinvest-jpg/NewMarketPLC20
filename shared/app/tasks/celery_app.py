@@ -51,6 +51,11 @@ celery_app.conf.update(
             "task": "app.tasks.tasks.rebuild_recommendations",
             "schedule": crontab(minute=0, hour=4),
         },
+        # Hourly: rebuild the MeiliSearch products index (no-op without Meili)
+        "rebuild-search-index": {
+            "task": "app.tasks.tasks.rebuild_search_index",
+            "schedule": crontab(minute=45),
+        },
         # Nightly: settle the promotion auction (charge winners, demote outbid)
         "settle-promotions": {
             "task": "app.tasks.tasks.settle_promotions",

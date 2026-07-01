@@ -1,11 +1,12 @@
 import { Outlet, Link, useNavigate } from 'react-router-dom'
-import { Layout, Menu, Button, Input, Badge, Avatar, Dropdown, Space, Select, Drawer, Grid } from 'antd'
+import { Layout, Menu, Button, Badge, Avatar, Dropdown, Space, Select, Drawer, Grid } from 'antd'
 import {
   ShoppingCartOutlined, UserOutlined,
   ShopOutlined, MessageOutlined, LogoutOutlined, HeartOutlined, SwapOutlined,
   CustomerServiceOutlined, GiftOutlined, SettingOutlined, MenuOutlined, LoginOutlined,
 } from '@ant-design/icons'
 import NotificationBell from '@/components/common/NotificationBell'
+import SearchBox from '@/components/common/SearchBox'
 import { useCompareStore } from '@/store/compareStore'
 import { useCurrencyStore } from '@/store/currencyStore'
 import { currencyApi } from '@/api'
@@ -24,8 +25,7 @@ export default function MainLayout() {
   const compareCount = useCompareStore((s) => s.items.length)
   const { current: currentCurrency, rates, setCurrent, setRates } = useCurrencyStore()
   const navigate = useNavigate()
-  const { t, i18n } = useTranslation()
-  const [searchQuery, setSearchQuery] = useState('')
+  const { t } = useTranslation()
   // md === false only after the breakpoint hook resolves — avoids a mobile-menu
   // flash on desktop during the very first render (screens starts as {}).
   const screens = Grid.useBreakpoint()
@@ -42,12 +42,6 @@ export default function MainLayout() {
   useEffect(() => {
     currencyApi.list().then(setRates).catch(() => {})
   }, [])
-
-  const handleSearch = () => {
-    if (searchQuery.trim()) {
-      navigate(`/catalog?q=${encodeURIComponent(searchQuery.trim())}`)
-    }
-  }
 
   const isStaff = user?.role === 'support' || user?.role === 'moderator' || user?.role === 'superadmin'
   const isSeller = user?.role === 'seller' || user?.role === 'superadmin'
@@ -174,12 +168,8 @@ export default function MainLayout() {
           </Space>
         )}
 
-        {/* Search — on mobile drops to its own full-width second row */}
-        <Input.Search
-          placeholder={t('header.search')}
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          onSearch={handleSearch}
+        {/* Search — live suggestions; on mobile drops to its own full-width second row */}
+        <SearchBox
           style={isMobile ? { flexBasis: '100%', order: 2 } : { flex: 1, minWidth: 180, maxWidth: 600 }}
           size={isMobile ? 'middle' : 'large'}
         />

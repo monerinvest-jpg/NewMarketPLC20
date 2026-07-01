@@ -79,6 +79,10 @@
       SMTP_PASSWORD: "{{ smtp_password | default('') }}"
       SMTP_FROM: "{{ smtp_from | default('no-reply@example.com') }}"
       FRONTEND_URL: "{{ frontend_url | default('https://' + (public_domain | default('localhost'))) }}"
+      # Full-text search: MeiliSearch runs on the FIRST backend node (see the
+      # "Run MeiliSearch" task below); services on both nodes query it in-VPC.
+      MEILI_URL: "http://{{ hostvars[groups['backend'][0]].ansible_host | default(groups['backend'][0]) }}:7700"
+      MEILI_KEY: "{{ meili_key | default('') }}"
 
   tasks:
     - name: Ensure Docker is present
@@ -109,6 +113,19 @@
         src: files/root.crt
         dest: /opt/handmade/certs/root.crt
         mode: "0644"
+
+    - name: Run MeiliSearch (full-text search engine, once on the first backend node)
+      run_once: true
+      shell: >
+        docker rm -f meilisearch 2>/dev/null || true;
+        docker run -d --name meilisearch --restart always
+        -p 7700:7700
+        -e MEILI_MASTER_KEY={{ meili_key | default('') | quote }}
+        -e MEILI_NO_ANALYTICS=true
+        -e MEILI_ENV=production
+        -v meili-data:/meili_data
+        getmeili/meilisearch:v1.12
+      changed_when: false
 
     - name: Run database migrations + seed (once, against the shared DB)
       run_once: true

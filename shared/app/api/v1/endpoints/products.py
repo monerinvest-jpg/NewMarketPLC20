@@ -116,6 +116,16 @@ async def list_products(
     }
 
 
+@router.get("/suggest", response_model=dict)
+async def suggest_endpoint(
+    q: str = Query(..., min_length=2, max_length=80),
+    db: AsyncSession = Depends(get_db),
+):
+    """Header autocomplete: a few products (thumb + price), categories, shops."""
+    from app.services.search_service import suggest
+    return await suggest(db, q)
+
+
 @router.get("/search", response_model=dict)
 async def search_products_endpoint(
     q: str = Query(..., min_length=1),
