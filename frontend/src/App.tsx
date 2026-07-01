@@ -37,6 +37,7 @@ const SellerApp = lazy(() => import('./seller/SellerApp'))
 
 const ChatPage = lazy(() => import('./pages/buyer/ChatPage'))
 const ComparePage = lazy(() => import('./pages/catalog/ComparePage'))
+const InfoPage = lazy(() => import('./pages/info/InfoPage'))
 
 // Admin pages
 const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'))
@@ -165,6 +166,8 @@ function App() {
               <Route path="/reset-password" element={<ResetPasswordPage />} />
               {/* Cart is public: guests collect items locally, log in at checkout. */}
               <Route path="/cart" element={<CartPage />} />
+              {/* Static info / legal pages (footer links) */}
+              <Route path="/info/:slug" element={<InfoPage />} />
 
               {/* Buyer protected */}
               <Route element={<ProtectedRoute />}>

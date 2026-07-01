@@ -290,8 +290,50 @@ export default function MainLayout() {
         <Outlet />
       </Content>
 
-      <Footer style={{ textAlign: 'center', background: '#fffdf9', borderTop: '1px solid #efe3d2', color: '#a8957f' }}>
-        🪵 {t('footer')} · © {new Date().getFullYear()}
+      <Footer style={{ background: '#fffdf9', borderTop: '1px solid #efe3d2', padding: '32px 0 20px' }}>
+        <div className="page-container">
+          <div
+            style={{
+              display: 'grid', gap: 24, marginBottom: 24,
+              gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)',
+            }}
+          >
+            <div>
+              <div style={{ fontWeight: 700, color: '#5b3a1e', marginBottom: 10 }}>Покупателям</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <Link to="/info/faq" style={{ color: '#8c7a66' }}>Вопросы и ответы</Link>
+                <Link to="/info/delivery" style={{ color: '#8c7a66' }}>Доставка и оплата</Link>
+                <Link to="/returns" style={{ color: '#8c7a66' }}>Возвраты</Link>
+                <Link to="/support" style={{ color: '#8c7a66' }}>Поддержка</Link>
+              </div>
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, color: '#5b3a1e', marginBottom: 10 }}>Продавцам</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <a href={sellerOrigin() + '/'} style={{ color: '#8c7a66' }}>Кабинет продавца</a>
+                <Link to="/info/faq" style={{ color: '#8c7a66' }}>Как начать продавать</Link>
+              </div>
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, color: '#5b3a1e', marginBottom: 10 }}>Компания</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <Link to="/info/about" style={{ color: '#8c7a66' }}>О нас</Link>
+                <Link to="/info/contacts" style={{ color: '#8c7a66' }}>Контакты</Link>
+              </div>
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, color: '#5b3a1e', marginBottom: 10 }}>Документы</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <Link to="/info/oferta" style={{ color: '#8c7a66' }}>Публичная оферта</Link>
+                <Link to="/info/privacy" style={{ color: '#8c7a66' }}>Политика конфиденциальности</Link>
+                <Link to="/info/terms" style={{ color: '#8c7a66' }}>Пользовательское соглашение</Link>
+              </div>
+            </div>
+          </div>
+          <div style={{ textAlign: 'center', color: '#a8957f', borderTop: '1px solid #efe3d2', paddingTop: 16 }}>
+            🪵 {t('footer')} · © {new Date().getFullYear()}
+          </div>
+        </div>
       </Footer>
     </Layout>
   )
