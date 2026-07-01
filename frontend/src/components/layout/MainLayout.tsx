@@ -32,7 +32,8 @@ export default function MainLayout() {
   const [menuOpen, setMenuOpen] = useState(false)
 
   useEffect(() => {
-    if (user) fetchCart()
+    // Guests get a local cart; authenticated users get the server cart.
+    fetchCart()
   }, [user])
 
   useEffect(() => {
@@ -152,7 +153,7 @@ export default function MainLayout() {
           <Space size={4} style={{ marginLeft: 'auto' }}>
             {user && <NotificationBell />}
             <Link to="/cart" aria-label="Корзина">
-              <Badge count={user ? totalItems() : 0} size="small">
+              <Badge count={totalItems()} size="small">
                 <Button type="text" icon={<ShoppingCartOutlined style={{ fontSize: 20 }} />} />
               </Badge>
             </Link>
@@ -225,6 +226,11 @@ export default function MainLayout() {
             </>
           ) : (
             <>
+              <Link to="/cart" aria-label="Корзина">
+                <Badge count={totalItems()} size="small">
+                  <Button type="text" icon={<ShoppingCartOutlined style={{ fontSize: 20 }} />} />
+                </Badge>
+              </Link>
               <Link to="/login"><Button>{t('nav.login')}</Button></Link>
               <Link to="/register"><Button type="primary">{t('nav.register')}</Button></Link>
             </>

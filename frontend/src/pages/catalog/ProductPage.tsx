@@ -102,7 +102,7 @@ export default function ProductPage() {
   })()
 
   const handleAddToCart = async () => {
-    if (!user) { message.info('Войдите, чтобы добавить в корзину'); return }
+    // Guests can add too — the cart store keeps a local copy until login.
     if (variants.length > 0 && !selectedVariant) { message.warning('Выберите вариант товара'); return }
     try {
       await addItem(parseInt(id!), quantity, selectedVariant || undefined)

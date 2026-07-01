@@ -17,7 +17,7 @@ function ProductCard({ product }: { product: Product }) {
 
   const handleAddToCart = async (e: React.MouseEvent) => {
     e.preventDefault()
-    if (!user) { message.info('Войдите, чтобы добавить в корзину'); return }
+    // Guests can add too — the cart store keeps a local copy until login.
     try {
       await addItem(product.id)
       message.success('Добавлено в корзину')

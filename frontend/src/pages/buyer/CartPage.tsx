@@ -6,6 +6,7 @@ import {
 } from 'antd'
 import { DeleteOutlined, ShoppingOutlined } from '@ant-design/icons'
 import { useCartStore } from '@/store/cartStore'
+import { useAuthStore } from '@/store/authStore'
 import { recommendationsApi, promoRulesApi } from '@/api'
 import RecommendationRow from '@/components/common/RecommendationRow'
 import type { Product, CartPromoSummary } from '@/types'
@@ -14,22 +15,33 @@ const { Title, Text } = Typography
 
 export default function CartPage() {
   const { items, loading, fetchCart, updateItem, removeItem, totalPrice } = useCartStore()
+  const { user } = useAuthStore()
   const navigate = useNavigate()
   const [recs, setRecs] = useState<Product[]>([])
   const [promo, setPromo] = useState<CartPromoSummary | null>(null)
 
-  useEffect(() => { fetchCart() }, [])
+  useEffect(() => { fetchCart() }, [user])
 
   useEffect(() => {
     const ids = items.map((i) => i.product_id)
     if (ids.length > 0) {
       recommendationsApi.forCart(ids).then(setRecs).catch(() => {})
-      promoRulesApi.cartSummary().then(setPromo).catch(() => {})
+      // Promo rules evaluate the SERVER cart — meaningless for a guest's local cart.
+      if (user) promoRulesApi.cartSummary().then(setPromo).catch(() => {})
     } else {
       setRecs([])
       setPromo(null)
     }
-  }, [items])
+  }, [items, user])
+
+  const handleCheckout = () => {
+    if (!user) {
+      message.info('Войдите, чтобы оформить заказ — корзина сохранится')
+      navigate('/login')
+      return
+    }
+    navigate('/checkout')
+  }
 
   if (loading) return null
 
@@ -124,9 +136,9 @@ export default function CartPage() {
           </div>
           <Button
             type="primary" size="large" block icon={<ShoppingOutlined />}
-            onClick={() => navigate('/checkout')}
+            onClick={handleCheckout}
           >
-            Оформить заказ
+            {user ? 'Оформить заказ' : 'Войти и оформить заказ'}
           </Button>
         </Card>
       </div>

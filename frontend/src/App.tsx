@@ -163,10 +163,11 @@ function App() {
               <Route path="/verify-email" element={<VerifyEmailPage />} />
               <Route path="/forgot-password" element={<ForgotPasswordPage />} />
               <Route path="/reset-password" element={<ResetPasswordPage />} />
+              {/* Cart is public: guests collect items locally, log in at checkout. */}
+              <Route path="/cart" element={<CartPage />} />
 
               {/* Buyer protected */}
               <Route element={<ProtectedRoute />}>
-                <Route path="/cart" element={<CartPage />} />
                 <Route path="/checkout" element={<CheckoutPage />} />
                 <Route path="/orders" element={<OrdersPage />} />
                 <Route path="/orders/:id" element={<OrderDetailPage />} />

@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { User } from '@/types'
 import { authApi } from '@/api'
+import { useCartStore } from './cartStore'
 
 interface AuthState {
   user: User | null
@@ -26,6 +27,8 @@ export const useAuthStore = create<AuthState>()(
         localStorage.setItem('access_token', access)
         localStorage.setItem('refresh_token', refresh)
         set({ accessToken: access, refreshToken: refresh })
+        // Carry over anything the visitor collected before signing in.
+        useCartStore.getState().mergeGuestCart().catch(() => {})
       },
 
       login: async (email, password) => {
@@ -40,6 +43,8 @@ export const useAuthStore = create<AuthState>()(
           })
           const user = await authApi.me()
           set({ user })
+          // Merge the guest cart into the server cart (idempotent, never throws).
+          await useCartStore.getState().mergeGuestCart().catch(() => {})
         } finally {
           set({ isLoading: false })
         }
