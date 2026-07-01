@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Документация проекта — Маркетплейс</title>
+<style>
+  @page { size: A4; margin: 20mm 16mm; }
+  @page :first { margin: 0; }
+  * { box-sizing: border-box; }
+  html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body {
+    font-family: "Segoe UI", "Inter", -apple-system, sans-serif;
+    color: #2c2c2c; font-size: 10.5pt; line-height: 1.55; margin: 0;
+  }
+  h1, h2, h3, h4 { color: #5b3a1e; line-height: 1.25; }
+  h2 { font-size: 18pt; border-bottom: 3px solid #b45309; padding-bottom: 6px; margin-top: 34px; }
+  h3 { font-size: 13.5pt; margin-top: 22px; color: #7c4a21; }
+  h4 { font-size: 11.5pt; margin-top: 16px; margin-bottom: 4px; color: #8a5a2b; }
+  p { margin: 6px 0; }
+  a { color: #b45309; text-decoration: none; }
+  code { background: #f3ead9; padding: 1px 5px; border-radius: 4px; font-family: "Consolas", monospace; font-size: 9pt; color: #7c3a10; }
+  ul, ol { margin: 6px 0 6px 0; padding-left: 22px; }
+  li { margin: 3px 0; }
+  table { border-collapse: collapse; width: 100%; margin: 10px 0; font-size: 9pt; }
+  th, td { border: 1px solid #e0d3bf; padding: 6px 8px; text-align: left; vertical-align: top; }
+  th { background: #f3e3cf; color: #5b3a1e; font-weight: 600; }
+  tr:nth-child(even) td { background: #fbf6ee; }
+  .cover {
+    height: 297mm; display: flex; flex-direction: column; justify-content: center;
+    align-items: center; text-align: center; color: #fff;
+    background: linear-gradient(150deg, #7c4a21 0%, #b45309 55%, #d98324 100%);
+    page-break-after: always; padding: 0 30mm;
+  }
+  .cover .logo { font-size: 64pt; margin-bottom: 10px; }
+  .cover h1 { color: #fff; font-size: 34pt; margin: 0 0 8px; border: none; }
+  .cover .sub { font-size: 15pt; opacity: 0.95; }
+  .cover .meta { margin-top: 40px; font-size: 11pt; opacity: 0.9; line-height: 1.9; }
+  .cover .badge { margin-top: 26px; font-size: 10pt; background: rgba(255,255,255,0.16); padding: 8px 18px; border-radius: 40px; }
+  .callout { background: #fbf6ee; border-left: 4px solid #b45309; padding: 10px 14px; margin: 12px 0; border-radius: 0 6px 6px 0; }
+  .rec { background: #f2f7ec; border-left: 4px solid #4d7c0f; padding: 10px 14px; margin: 10px 0; border-radius: 0 6px 6px 0; }
+  .warn { background: #fdf3ec; border-left: 4px solid #d98324; padding: 10px 14px; margin: 10px 0; border-radius: 0 6px 6px 0; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 20px; }
+  pre.diagram { background: #2c2416; color: #f0e4cf; padding: 16px; border-radius: 8px; font-family: "Consolas", monospace; font-size: 8pt; line-height: 1.35; overflow-x: auto; white-space: pre; }
+  .toc { columns: 2; column-gap: 30px; font-size: 10pt; }
+  .toc a { color: #444; }
+  .toc .num { color: #b45309; font-weight: 600; }
+  .kpi { display: flex; flex-wrap: wrap; gap: 10px; margin: 14px 0; }
+  .kpi div { flex: 1 1 120px; background: #f3e3cf; border-radius: 8px; padding: 10px 12px; text-align: center; }
+  .kpi .n { font-size: 20pt; font-weight: 700; color: #b45309; display: block; }
+  .kpi .l { font-size: 8.5pt; color: #7c4a21; }
+  .tag { display: inline-block; background: #ede0cc; color: #7c4a21; border-radius: 4px; padding: 1px 7px; font-size: 8.5pt; margin: 2px; }
+  section { page-break-inside: auto; }
+  h2 { page-break-after: avoid; }
+  .pb { page-break-before: always; }
+  footer { text-align: center; color: #a8957f; font-size: 8pt; margin-top: 30px; border-top: 1px solid #e0d3bf; padding-top: 8px; }
+</style>
+</head>
+<body>
+
+<!-- ───────────────────────── COVER ───────────────────────── -->
+<div class="cover">
+  <div class="logo">🪵</div>
+  <h1>Маркетплейс</h1>
+  <div class="sub">Полная техническая и функциональная документация</div>
+  <div class="meta">
+    Микросервисная платформа электронной коммерции<br>
+    handmade-товары · цифровые товары · онлайн-курсы (LMS)<br>
+    FastAPI · React · PostgreSQL · Yandex Cloud
+  </div>
+  <div class="badge">Версия документа 1.0 · Июль 2026</div>
+</div>
+
+<!-- ───────────────────────── TOC ───────────────────────── -->
+<h2 id="toc">Оглавление</h2>
+<div class="toc">
+  <p><span class="num">1.</span> <a href="#overview">Обзор проекта</a></p>
+  <p><span class="num">2.</span> <a href="#stack">Технологический стек</a></p>
+  <p><span class="num">3.</span> <a href="#arch">Архитектура</a></p>
+  <p><span class="num">4.</span> <a href="#services">Микросервисы и их границы</a></p>
+  <p><span class="num">5.</span> <a href="#data">Модель данных</a></p>
+  <p><span class="num">6.</span> <a href="#svc-layer">Слой бизнес-логики</a></p>
+  <p><span class="num">7.</span> <a href="#api">API</a></p>
+  <p><span class="num">8.</span> <a href="#tasks">Фоновые задачи (Celery)</a></p>
+  <p><span class="num">9.</span> <a href="#integrations">Внешние интеграции</a></p>
+  <p><span class="num">10.</span> <a href="#frontend">Фронтенд</a></p>
+  <p><span class="num">11.</span> <a href="#seller-sub">Кабинет продавца (поддомен)</a></p>
+  <p><span class="num">12.</span> <a href="#infra">Инфраструктура и деплой</a></p>
+  <p><span class="num">13.</span> <a href="#security">Безопасность</a></p>
+  <p><span class="num">14.</span> <a href="#features">Функциональные возможности</a></p>
+  <p><span class="num">15.</span> <a href="#recommend">Рекомендации: что есть и что улучшить</a></p>
+</div>
+
+<!-- ───────────────────────── 1. OVERVIEW ───────────────────────── -->
+<section class="pb">
+<h2 id="overview">1. Обзор проекта</h2>
+<p><b>Маркетплейс</b> — это полнофункциональная многосторонняя платформа электронной
+коммерции (multi-vendor marketplace) с уклоном в <b>handmade / крафтовые товары</b>.
+Помимо классической продажи физических товаров платформа поддерживает два дополнительных
+бизнес-направления: <b>цифровые товары с мгновенной доставкой</b> (файлы, лицензии) и
+<b>встроенную LMS</b> — продажу и прохождение онлайн-курсов с видео, уроками, тестами и
+сертификатами.</p>
+
+<p>Проект реализует полный жизненный цикл торговли: витрину и каталог, корзину и оформление
+заказа, онлайн-оплату с фискализацией (54-ФЗ), доставку через российских логистических
+операторов, разделение платежей между продавцами, вывод средств, возвраты и споры,
+поддержку, маркетинговые инструменты (промокоды, акции, продвижение, программы лояльности
+и рефералов), а также богатую админ-панель и отдельные кабинеты для продавцов.</p>
+
+<div class="kpi">
+  <div><span class="n">~38K</span><span class="l">строк кода (backend + frontend)</span></div>
+  <div><span class="n">85</span><span class="l">таблиц БД</span></div>
+  <div><span class="n">347</span><span class="l">API-эндпоинтов</span></div>
+  <div><span class="n">50</span><span class="l">сервисов бизнес-логики</span></div>
+  <div><span class="n">~96</span><span class="l">экранов фронтенда</span></div>
+  <div><span class="n">5</span><span class="l">микросервисов + worker</span></div>
+</div>
+
+<div class="callout">
+<b>Целевая аудитория и роли.</b> В системе пять ролей пользователей:
+<span class="tag">buyer — покупатель</span>
+<span class="tag">seller — продавец</span>
+<span class="tag">support — поддержка</span>
+<span class="tag">moderator — модератор</span>
+<span class="tag">superadmin — суперадмин</span>.
+Права внутри админки дополнительно гранулируются через RBAC (набор разрешений на пункты меню).
+</div>
+</section>
+
+<!-- ───────────────────────── 2. STACK ───────────────────────── -->
+<section>
+<h2 id="stack">2. Технологический стек</h2>
+<table>
+<tr><th>Слой</th><th>Технологии</th></tr>
+<tr><td>Backend</td><td>Python 3.12, <b>FastAPI</b>, SQLAlchemy 2 (async), Pydantic v2 / pydantic-settings, Alembic (миграции), Uvicorn</td></tr>
+<tr><td>База данных</td><td><b>PostgreSQL 17</b> (Yandex Managed, пулер :6432), драйвер asyncpg</td></tr>
+<tr><td>Кэш / очереди</td><td><b>Redis / Valkey 8</b>, <b>Celery</b> (worker + beat) для фоновых задач</td></tr>
+<tr><td>Поиск</td><td><b>Meilisearch</b> (опционально; fallback на ILIKE по БД)</td></tr>
+<tr><td>Frontend</td><td><b>React 18</b> + TypeScript, Vite, <b>Ant Design 5</b>, Zustand (состояние), React Router 6, i18next (RU/EN), Recharts, HLS.js</td></tr>
+<tr><td>API-шлюз</td><td><b>Kong 3.6</b> (Postgres-backed) — единый edge, маршрутизация по префиксам пути</td></tr>
+<tr><td>Инфраструктура</td><td><b>Yandex Cloud</b>: Network Load Balancer, Compute Instance Groups, Managed PostgreSQL/Redis, Object Storage (S3), Cloud DNS, Postbox (SMTP), Container Registry</td></tr>
+<tr><td>IaC / деплой</td><td><b>Terraform</b> (вся инфраструктура) + <b>Ansible</b> (выкатка контейнеров, настройка Kong), Docker</td></tr>
+<tr><td>Наблюдаемость</td><td>Prometheus + Grafana, Sentry (опционально), Prometheus-метрики на каждом сервисе</td></tr>
+<tr><td>Платежи / фискализация</td><td><b>ЮKassa (YooKassa)</b> + встроенная фискализация чеков 54-ФЗ</td></tr>
+<tr><td>Доставка</td><td>СДЭК, Ozon, Yandex Delivery, Почта России</td></tr>
+</table>
+</section>
+
+<!-- ───────────────────────── 3. ARCHITECTURE ───────────────────────── -->
+<section class="pb">
+<h2 id="arch">3. Архитектура</h2>
+
+<p>Изначально проект был <b>монолитом на FastAPI</b> (~16K строк). Была проведена
+поэтапная (staged) миграция:</p>
+<ul>
+  <li><b>Этап 1:</b> перевод с MySQL на PostgreSQL, адаптация под инфраструктуру Yandex Cloud.</li>
+  <li><b>Этап 2:</b> распил на <b>микросервисы поверх общей БД</b> (shared-database microservices) —
+  5 независимо разворачиваемых FastAPI-сервисов, разделённых по доменам, плюс Celery worker/beat.</li>
+</ul>
+
+<div class="callout">
+<b>Ключевое архитектурное решение.</b> Выбрана модель <b>«сервисы на общей Managed PostgreSQL»</b>,
+а НЕ классические микросервисы «БД на сервис». Общий код вынесен в устанавливаемую библиотеку
+<code>shared/app</code> (пакет <code>app</code>) — модели, схемы, сервисы, конфигурация переиспользуются
+всеми сервисами без дублирования. Каждый сервис — свой Docker-образ и своя запись маршрута в Kong.
+</div>
+
+<h3>Топология production</h3>
+<pre class="diagram">
+                          Интернет
+                             │
+                    ┌────────▼─────────┐
+                    │  Network LB (L4) │   :80 → target_port 8000
+                    └────────┬─────────┘
+                             │
+                    ┌────────▼─────────┐
+                    │   Kong Gateway   │   :8000, маршрутизация по префиксу пути
+                    │   (Postgres-bk)  │   host-agnostic; catch-all '/' → фронт
+                    └────────┬─────────┘
+        ┌──────────┬─────────┼──────────┬───────────┬───────────┐
+        ▼          ▼         ▼          ▼           ▼           ▼
+   ┌─────────┐┌────────┐┌────────┐┌─────────┐┌──────────┐┌──────────┐
+   │identity ││catalog ││ orders ││ sellers ││ platform ││ frontend │
+   │  :8001  ││ :8002  ││ :8003  ││  :8004  ││  :8005   ││  :3000   │
+   └────┬────┘└───┬────┘└───┬────┘└────┬────┘└────┬─────┘└──────────┘
+        └─────────┴─────────┼──────────┴──────────┘
+                            │        (+ worker / beat — Celery)
+             ┌──────────────┼───────────────┐
+             ▼              ▼                ▼
+   ┌──────────────────┐ ┌────────┐ ┌──────────────────┐
+   │ Managed Postgres │ │ Redis  │ │  Object Storage  │
+   │   17  (:6432)    │ │ Valkey │ │ public + private │
+   └──────────────────┘ └────────┘ └──────────────────┘
+</pre>
+
+<p>Фронтенд — отдельный статический контейнер (nginx), обращается к API по
+<b>относительному</b> <code>/api/v1</code> (тот же origin через Kong), поэтому CORS не требуется.
+Kong отдаёт catch-all маршрут <code>/</code> на фронтенд, а более длинные префиксы
+(<code>/api/v1/*</code>, <code>/health</code>, <code>/uploads</code>) выигрывают и уходят на backend.</p>
+</section>
+
+<!-- ───────────────────────── 4. SERVICES ───────────────────────── -->
+<section>
+<h2 id="services">4. Микросервисы и их границы</h2>
+<p>38 роутеров распределены строго по одному между пятью сервисами; префиксы пути принадлежат
+ровно одному сервису, что позволяет Kong маршрутизировать без коллизий.</p>
+
+<table>
+<tr><th>Сервис</th><th>Порт</th><th>Домен / префиксы Kong</th></tr>
+<tr><td><b>identity</b></td><td>8001</td><td>Аутентификация, пользователи, 2FA, безопасность: <code>/auth</code>, <code>/users</code>, <code>/2fa</code>, <code>/security</code></td></tr>
+<tr><td><b>catalog</b></td><td>8002</td><td>Товары, магазины, категории, отзывы, курсы (продажа), избранное, рекомендации, витрина: <code>/products</code>, <code>/shops</code>, <code>/reviews</code>, <code>/categories</code>, <code>/courses</code>, <code>/learning</code>, <code>/catalog</code>, <code>/home</code>, <code>/uploads</code></td></tr>
+<tr><td><b>orders</b></td><td>8003</td><td>Корзина, заказы, суб-заказы, возвраты, споры (покупатель), подписки на товары, адреса, вишлисты, цифровая библиотека, доставка: <code>/cart</code>, <code>/orders</code>, <code>/returns</code>, <code>/disputes</code>, <code>/sub-orders</code>, <code>/product-subscriptions</code>, <code>/addresses</code>, <code>/library</code></td></tr>
+<tr><td><b>sellers</b></td><td>8004</td><td>Весь кабинет продавца, инструменты, склад, тарифы/подписки, продвижение, споры продавца, академия, индивидуальные заказы: <code>/seller</code>, <code>/subscription</code>, <code>/promotions</code>, <code>/upload</code></td></tr>
+<tr><td><b>platform</b></td><td>8005</td><td>Уведомления, чат, поддержка, подарочные сертификаты, лояльность, валюты, вся <b>админ-панель</b>: <code>/notifications</code>, <code>/chat</code>, <code>/support</code>, <code>/gift-certificates</code>, <code>/loyalty</code>, <code>/currencies</code>, <code>/admin</code></td></tr>
+<tr><td><b>worker / beat</b></td><td>—</td><td>Celery: периодические и отложенные задачи (тот же образ, команды <code>worker</code>/<code>beat</code>)</td></tr>
+</table>
+<p>Локально топология зеркалируется через <code>gateway/nginx.conf</code> (аналог маршрутов Kong)
+и <code>docker-compose.yml</code> (gateway + 5 сервисов + worker/beat + migrate + Postgres/Redis + frontend).</p>
+</section>
+
+<!-- ───────────────────────── 5. DATA MODEL ───────────────────────── -->
+<section class="pb">
+<h2 id="data">5. Модель данных</h2>
+<p>Единая схема из <b>85 таблиц</b> и ~33 перечислений (enum). Enum-типы намеренно объявлены как
+<code>VARCHAR + CHECK</code> (native_enum=False), чтобы избежать проблем PostgreSQL с повторным
+созданием/изменением типов. Ниже таблицы сгруппированы по доменам.</p>
+
+<h4>Пользователи, магазины, доступ</h4>
+<p>user, shop, shop_member, seller_verification, seller_requisites, seller_plan, seller_subscription,
+withdrawal_account, verification_code, password_reset_token, audit_log, feature_flag, settings</p>
+
+<h4>Каталог и контент</h4>
+<p>category, product, product_image, product_variant, product_co_purchase, attribute,
+product_attribute_value, product_question, favorite, product_view, homepage_banner</p>
+
+<h4>Цифровые товары и LMS (курсы)</h4>
+<p>digital_asset, entitlement, course, course_module, course_lesson, lesson_progress,
+quiz_attempt, certificate, academy_course, academy_lesson, academy_progress</p>
+
+<h4>Заказы, платежи, финансы</h4>
+<p>cart_item, order, order_item, sub_order, payment, fiscal_receipt, transaction,
+delivery_info, return_request, payout_request, balance_transaction, installment_plan,
+withdrawal_account</p>
+
+<h4>Отзывы, вопросы, споры, поддержка</h4>
+<p>review, review_reply, review_vote, review_photo, product_question, report,
+dispute, dispute_message, support_ticket, support_message</p>
+
+<h4>Маркетинг и лояльность</h4>
+<p>coupon, seller_coupon, promotion, ad_wallet_transaction, promo_rule, bundle, bundle_item,
+flash_sale, campaign, referral, referral_reward, gift_certificate, promo_balance_transaction,
+loyalty_tier, paid_feature</p>
+
+<h4>Коммуникации и прочее</h4>
+<p>notification, chat_thread, chat_message, chat_template, sms_log, product_subscription,
+shop_follow, currency_rate, address, wishlist_collection, wishlist_item, stock_movement,
+custom_request, custom_message</p>
+
+<div class="callout">
+<b>Замечание.</b> Модель насыщена кросс-доменными внешними ключами (~40 связей),
+поэтому и был выбран вариант общей БД: разрезать её на изолированные базы было бы дорого и
+рискованно на текущем этапе.
+</div>
+</section>
+
+<!-- ───────────────────────── 6. SERVICE LAYER ───────────────────────── -->
+<section>
+<h2 id="svc-layer">6. Слой бизнес-логики (50 сервисов)</h2>
+<p>Вся доменная логика вынесена в <code>shared/app/services</code> — тонкие роутеры вызывают сервисы.
+Ключевые из них:</p>
+
+<div class="grid2">
+<div>
+<h4>Продажи и деньги</h4>
+<ul>
+<li><b>payment_service</b> — оплата через ЮKassa</li>
+<li><b>fiscal_service</b> — чеки 54-ФЗ</li>
+<li><b>commission_service</b> — комиссии платформы</li>
+<li><b>suborder_service</b> — расщепление заказа по продавцам</li>
+<li><b>payout_service</b> — выплаты продавцам</li>
+<li><b>order_reversal_service</b> — отмены/возвраты денег</li>
+<li><b>return_service</b> — возвраты товаров</li>
+<li><b>bnpl_service</b> — рассрочка (BNPL)</li>
+<li><b>delivery_service</b> — логистические операторы</li>
+<li><b>stock_service / label_service</b> — склад, ярлыки</li>
+</ul>
+</div>
+<div>
+<h4>Каталог и контент</h4>
+<ul>
+<li><b>search_service</b> — Meilisearch / ILIKE</li>
+<li><b>recommendation_service</b> — «с этим покупают»</li>
+<li><b>rating_service</b> — рейтинги</li>
+<li><b>slug_service</b> — ЧПУ-адреса</li>
+<li><b>image_service</b> — обработка изображений</li>
+<li><b>course_service</b> — LMS, HLS-упаковка</li>
+<li><b>digital_storage_service</b> — приватная выдача файлов</li>
+<li><b>entitlement_service</b> — доступы к цифровым товарам</li>
+<li><b>certificate_service</b> — сертификаты курсов</li>
+</ul>
+</div>
+<div>
+<h4>Маркетинг</h4>
+<ul>
+<li><b>promotion_service</b> — продвижение</li>
+<li><b>promo_rules_service</b> — акции/наборы</li>
+<li><b>campaign_service</b> — рассылки</li>
+<li><b>referral_service</b> — рефералы</li>
+<li><b>gift_service</b> — подарочные сертификаты</li>
+<li><b>loyalty_service / loyalty_tier_service</b> — лояльность</li>
+<li><b>currency_service</b> — мультивалютность</li>
+<li><b>subscription_service</b> — подписки на товары</li>
+</ul>
+</div>
+<div>
+<h4>Платформа и доверие</h4>
+<ul>
+<li><b>rbac_service</b> — права в админке</li>
+<li><b>verification_service / trust_service</b> — KYC, доверие</li>
+<li><b>moderation_service</b> — модерация</li>
+<li><b>dispute_service / support_service</b> — споры, поддержка</li>
+<li><b>notification_service / email_service / sms_service</b></li>
+<li><b>analytics_service</b> — аналитика, когорты</li>
+<li><b>audit_service</b> — журнал действий</li>
+<li><b>twofa_service</b> — 2FA</li>
+<li><b>cache_service / settings_service</b></li>
+</ul>
+</div>
+</div>
+</section>
+
+<!-- ───────────────────────── 7. API ───────────────────────── -->
+<section class="pb">
+<h2 id="api">7. API</h2>
+<p>REST API на FastAPI: <b>347 эндпоинтов</b> в 29 роутер-модулях, единый префикс
+<code>/api/v1</code>. Автодокументация OpenAPI/Swagger доступна на каждом сервисе.</p>
+<table>
+<tr><th>Группа роутеров</th><th>Назначение</th></tr>
+<tr><td>auth, twofa, misc(users)</td><td>Регистрация, вход, refresh-токены, восстановление пароля, 2FA, профиль</td></tr>
+<tr><td>products, catalog_extra, shops, categories, reviews</td><td>Каталог, карточки товаров, магазины, отзывы, вопросы, атрибуты, варианты</td></tr>
+<tr><td>courses, digital_library, academy</td><td>Продажа/прохождение курсов, цифровая библиотека покупателя, академия продавца</td></tr>
+<tr><td>cart, orders, returns_orders, subscription</td><td>Корзина, оформление, статусы, возвраты, подписки на товары</td></tr>
+<tr><td>disputes, support</td><td>Споры по заказам (покупатель/продавец/арбитраж), тикеты поддержки</td></tr>
+<tr><td>seller_tools, seller_inventory, seller_extra</td><td>Кабинет продавца: товары, склад, аналитика, реквизиты, сотрудники, продвижение</td></tr>
+<tr><td>promo, promotions, gifts, loyalty</td><td>Промокоды, акции/наборы, продвижение, сертификаты, лояльность</td></tr>
+<tr><td>custom_orders</td><td>Индивидуальные заказы (запрос → расчёт → предоплата)</td></tr>
+<tr><td>notifications, misc(chat/delivery/currencies)</td><td>Уведомления, чат, доставка, валюты, баннеры</td></tr>
+<tr><td>admin</td><td>Вся админ-панель: пользователи, магазины, заказы, финансы, модерация, настройки</td></tr>
+</table>
+</section>
+
+<!-- ───────────────────────── 8. TASKS ───────────────────────── -->
+<section>
+<h2 id="tasks">8. Фоновые задачи (Celery)</h2>
+<p>Celery worker + beat выполняют периодические и отложенные операции:</p>
+<table>
+<tr><th>Задача</th><th>Расписание</th><th>Назначение</th></tr>
+<tr><td>auto_mark_delivered</td><td>каждый час</td><td>Автопометка отгруженных заказов доставленными через N дней</td></tr>
+<tr><td>auto_complete_orders</td><td>каждый час</td><td>Автозавершение доставленных заказов (запуск выплат продавцам)</td></tr>
+<tr><td>process_subscription_renewals</td><td>ежедневно 03:00</td><td>Списание/продление подписок продавцов на тарифы</td></tr>
+<tr><td>notify_product_subscriptions</td><td>каждые 15 мин</td><td>Уведомления «снова в наличии» / «цена упала»</td></tr>
+<tr><td>remind_abandoned_carts</td><td>ежедневно 12:00</td><td>Напоминания о брошенных корзинах</td></tr>
+<tr><td>rebuild_recommendations</td><td>ночью 04:00</td><td>Пересборка рекомендаций «покупают вместе»</td></tr>
+<tr><td>settle_promotions</td><td>периодически</td><td>Закрытие/расчёт кампаний продвижения</td></tr>
+<tr><td>support_sla_sweep</td><td>периодически</td><td>Эскалация обращений при нарушении SLA</td></tr>
+<tr><td>loyalty_decay</td><td>периодически</td><td>Сгорание/пересчёт баллов лояльности</td></tr>
+<tr><td>send_marketing_campaign</td><td>по триггеру</td><td>Отправка маркетинговых рассылок</td></tr>
+<tr><td>package_lesson_hls</td><td>по триггеру</td><td>Упаковка загруженного видео урока в HLS для стриминга</td></tr>
+</table>
+</section>
+
+<!-- ───────────────────────── 9. INTEGRATIONS ───────────────────────── -->
+<section class="pb">
+<h2 id="integrations">9. Внешние интеграции</h2>
+<table>
+<tr><th>Интеграция</th><th>Роль в системе</th></tr>
+<tr><td><b>ЮKassa (YooKassa)</b></td><td>Приём онлайн-платежей, возвраты; настраивается через <code>YOOKASSA_SHOP_ID/SECRET</code></td></tr>
+<tr><td><b>Фискализация 54-ФЗ</b></td><td>Встроенная фискализация чеков ЮKassa: коды НДС/СНО, признак предмета и способа расчёта, поддержка агентской схемы маркетплейса</td></tr>
+<tr><td><b>СДЭК, Ozon, Yandex Delivery, Почта России</b></td><td>Расчёт доставки и оформление отправлений через российских операторов</td></tr>
+<tr><td><b>SMSC.ru</b></td><td>SMS-уведомления и коды подтверждения (<code>sms_service</code>, лог в <code>sms_log</code>)</td></tr>
+<tr><td><b>SMTP / Yandex Postbox</b></td><td>Транзакционные письма (сброс пароля, уведомления); при пустом хосте письма пишутся в лог</td></tr>
+<tr><td><b>Yandex Object Storage (S3)</b></td><td>Два бакета: <b>публичный</b> (картинки товаров, per-object public-read) и <b>приватный</b> (цифровые товары, HLS, KYC — только presigned-выдача)</td></tr>
+<tr><td><b>Meilisearch</b></td><td>Полнотекстовый поиск (опционально; иначе fallback на ILIKE)</td></tr>
+<tr><td><b>Sentry</b></td><td>Трассировка ошибок (опционально)</td></tr>
+<tr><td><b>Prometheus + Grafana</b></td><td>Метрики каждого сервиса; дашборд встраивается в админку iframe-ом</td></tr>
+</table>
+<div class="callout">Все интеграции сделаны <b>опциональными и деградируемыми</b>: при отсутствии ключей
+система переключается на локальные заглушки (файлы на диск, письма в лог, поиск по БД), что упрощает
+локальную разработку.</div>
+</section>
+
+<!-- ───────────────────────── 10. FRONTEND ───────────────────────── -->
+<section>
+<h2 id="frontend">10. Фронтенд</h2>
+<p>SPA на React 18 + TypeScript + Ant Design 5, ~16K строк, около <b>96 экранов</b>. Состояние —
+Zustand (auth, cart, compare, currency). Локализация RU/EN через i18next. Ленивая загрузка (code-splitting)
+всех страниц.</p>
+
+<h3>Дизайн-язык «craft / wood»</h3>
+<p>Тёплая палитра ремесленного маркетплейса: акцент <code>#b45309</code> (терракота/амбра),
+успех <code>#4d7c0f</code> (мох), заголовки <code>#5b3a1e</code> (орех), фон-пергамент
+<code>#f7f1e8</code>, скруглённые углы, лёгкая текстура дерева. Логотип 🪵 Маркетплейс.</p>
+
+<h3>Экраны по ролям</h3>
+<table>
+<tr><th>Раздел</th><th>Кол-во</th><th>Примеры</th></tr>
+<tr><td>Витрина (catalog)</td><td>6</td><td>Главная, каталог, карточка товара, магазин, сравнение, проверка сертификата</td></tr>
+<tr><td>Аутентификация</td><td>5</td><td>Вход, регистрация, сброс/восстановление пароля, подтверждение e-mail</td></tr>
+<tr><td>Покупатель (buyer)</td><td>22</td><td>Корзина, checkout, заказы, возвраты, споры, чат, избранное, коллекции, адреса, лояльность, сертификаты, рефералы, обучение, покупки, подписки, 2FA</td></tr>
+<tr><td>Продавец (seller)</td><td>23</td><td>Дашборд, товары, заказы, склад, импорт CSV, аналитика, отзывы, возвраты, промокоды, акции, продвижение, выплаты, тариф, реквизиты, сотрудники, KYC, академия, споры, курсы, индивидуальные заказы</td></tr>
+<tr><td>Админка (admin)</td><td>33</td><td>Дашборд, пользователи, магазины, верификации, товары, модерация, категории, заказы, выплаты, чеки, купоны, баннеры, рассылки, сертификаты, лояльность, тарифы, платные возможности, академия, валюты, жалобы, feature-flags, SMS, аудит, реконсиляция, когорты, метрики, настройки</td></tr>
+<tr><td>Поддержка (support)</td><td>2</td><td>Стол поддержки, арбитраж споров</td></tr>
+</table>
+
+<h3>Навигация</h3>
+<p>Админка и кабинет продавца используют группированное <b>боковое меню (sider)</b> из сворачиваемых
+секций; в админке пункты фильтруются по RBAC-правам пользователя. Меню покупателя — сгруппированный
+выпадающий список у аватара.</p>
+</section>
+
+<!-- ───────────────────────── 11. SELLER SUBDOMAIN ───────────────────────── -->
+<section class="pb">
+<h2 id="seller-sub">11. Кабинет продавца на отдельном поддомене</h2>
+<p>Кабинет продавца вынесен на <b>отдельный вход на поддомене</b> <code>seller.&lt;домен&gt;</code>
+с собственным sider-меню в стиле админки (6 групп: Обзор / Товары / Продажи / Маркетинг / Финансы /
+Магазин).</p>
+
+<h4>Как устроено (Вариант 1 — единый бандл, host-aware)</h4>
+<ul>
+<li>Тот же фронтенд-контейнер и бандл обслуживают и витрину, и поддомен. На старте SPA проверяет
+<code>window.location.hostname</code>; если он начинается с <code>seller.</code> — рендерится
+отдельное приложение продавца (свой логин + <code>SellerLayout</code>) вместо витрины.</li>
+<li>Внутри кабинета — корневые URL: <code>seller.&lt;домен&gt;/products</code>, <code>/orders</code> и т.д.
+Старые ссылки <code>&lt;домен&gt;/seller/*</code> редиректят на поддомен.</li>
+<li>Отдельный вход отклоняет не-продавцов; авторизация в localStorage пер-origin, поэтому вход на
+поддомене независим от витрины.</li>
+</ul>
+
+<h4>Инфраструктура — только DNS</h4>
+<p>Kong catch-all <code>/</code> и <code>/api/v1/*</code> маршрутизируются по пути (host-agnostic),
+поэтому тот же контейнер и backend уже обслуживают поддомен. Управление DNS вынесено в Terraform
+(<code>infra/terraform/dns.tf</code>, включается переменной <code>domain_name</code>): создаётся зона
+Cloud DNS + A-записи апекса и <code>seller.</code> на один и тот же IP балансировщика. Роль
+<code>dns.editor</code> у СА Terraform.</p>
+
+<div class="rec"><b>На будущее (Вариант 2).</b> Код изолирован (<code>SellerApp</code> — самостоятельное
+дерево роутов), поэтому переезд на отдельную сборку/контейнер с собственным маршрутом Kong по хосту
+будет правкой сборки, а не переписыванием.</div>
+</section>
+
+<!-- ───────────────────────── 12. INFRA ───────────────────────── -->
+<section>
+<h2 id="infra">12. Инфраструктура и деплой</h2>
+<h3>Terraform</h3>
+<p>Вся инфраструктура описана в <code>infra/terraform</code>: сеть (public/private подсети),
+Managed PostgreSQL 17 и Redis/Valkey, Compute Instance Groups для Kong и backend, Network Load Balancer,
+target-группы, Object Storage (2 бакета + статический ключ), Postbox (SMTP), Cloud DNS, а также
+автогенерируемый Ansible-инвентарь <code>hosts.ini</code> со всеми секретами и адресами.</p>
+
+<h3>Ansible</h3>
+<p>Плейбуки в <code>infra/ansible</code>: <code>deploy-all.yml</code> (CA БД → сервисы+миграции+Kong →
+фронтенд одной командой), <code>deploy-services.yml</code> (5 сервисов + worker/beat + маршруты Kong),
+<code>deploy-frontend.yml</code> (независимый контейнер фронта + catch-all Kong),
+<code>kong-setup.yml</code> (bootstrap Kong на Postgres), <code>observability.yml</code>
+(Prometheus + Grafana на бастионе).</p>
+
+<h3>CI/CD</h3>
+<p>GitHub Actions: <code>ci.yml</code> (компиляция backend + pytest, сборка фронта) и
+<code>deploy.yml</code> (сборка и пуш 6 backend-образов + фронтенда в Yandex Container Registry,
+опциональный передеплой Ansible). Скрипт <code>build-and-push.sh</code> собирает и пушит 7 образов.</p>
+
+<div class="callout"><b>Env-контракт.</b> Ansible инжектит в контейнеры строгий набор переменных:
+<code>DATABASE_URL</code> и <code>DB_*</code> (пулер :6432), <code>REDIS_URL</code>,
+<code>SECRET_KEY</code>/<code>REFRESH_SECRET_KEY</code>/<code>JWT_ALGORITHM</code>, S3_* и SMTP_*,
+<code>FRONTEND_URL</code>. Миграции запускаются одноразовым контейнером (<code>migrate</code>),
+образ backend диспетчеризует команды <code>migrate | web | worker | beat | seed</code>.</div>
+</section>
+
+<!-- ───────────────────────── 13. SECURITY ───────────────────────── -->
+<section class="pb">
+<h2 id="security">13. Безопасность</h2>
+<ul>
+<li><b>JWT-аутентификация</b> с раздельными секретами для access- и refresh-токенов;
+авто-обновление токена на 401 через перехватчик axios.</li>
+<li><b>RBAC</b> в админке: набор разрешений определяет доступные пункты меню и эндпоинты
+(<code>rbac_service</code>, эндпоинт «моё меню»).</li>
+<li><b>Двухфакторная аутентификация (2FA)</b> — отдельный сервис и экраны.</li>
+<li><b>KYC / верификация продавцов</b> (<code>verification_service</code>, <code>trust_service</code>):
+статусы доверия, VIP, документы хранятся в приватном бакете.</li>
+<li><b>Разделение хранилищ:</b> публичные ассеты и приватные (цифровые товары, HLS, KYC) — разные
+бакеты; приватные отдаются только по presigned-URL, анонимный доступ = 403.</li>
+<li><b>Rate limiting</b> (<code>core/ratelimit.py</code>), хеширование паролей bcrypt.</li>
+<li><b>Аудит действий</b> (<code>audit_log</code>) для чувствительных операций админки.</li>
+<li><b>TLS БД:</b> поддержка <code>DB_SSL</code> + корневой сертификат Yandex для Managed PostgreSQL.</li>
+</ul>
+<div class="warn"><b>Открытый пункт.</b> На публичном контуре пока <b>нет HTTPS</b> на самом edge:
+NLB работает на L4 (TCP), TLS предполагается терминировать на Kong отдельным шагом (сертификат
+wildcard <code>*.&lt;домен&gt;</code> или SAN с поддоменом). Grafana развёрнута с анонимным доступом —
+допустимо для демо, требует закрытия в проде.</div>
+</section>
+
+<!-- ───────────────────────── 14. FEATURES ───────────────────────── -->
+<section>
+<h2 id="features">14. Функциональные возможности</h2>
+
+<h3>14.1 Покупатель</h3>
+<ul>
+<li>Каталог с фильтрами, атрибутами, вариантами товара, сравнением, вопросами к товару.</li>
+<li>Корзина, оформление заказа, несколько адресов доставки, выбор оператора доставки.</li>
+<li>Онлайн-оплата с чеком 54-ФЗ; <b>рассрочка (BNPL)</b>.</li>
+<li>Заказы и суб-заказы (по разным продавцам), отслеживание статусов, возвраты, споры.</li>
+<li><b>Цифровые товары</b>: мгновенная выдача файлов, личная библиотека покупок.</li>
+<li><b>Онлайн-курсы</b>: плеер с HLS-видео, уроки, тесты, прогресс, сертификаты с проверкой по коду.</li>
+<li>Избранное, коллекции (вишлисты), подписка на магазины, подписки на товары
+(«снова в наличии»/«цена упала»).</li>
+<li>Программа <b>лояльности</b> (уровни/баллы), <b>рефералы</b>, <b>подарочные сертификаты</b> и промо-баланс.</li>
+<li><b>Индивидуальные заказы</b>: запрос на изготовление → расчёт продавцом → частичная предоплата.</li>
+<li>Чат с продавцом, уведомления, тикеты поддержки, мультивалютность, RU/EN.</li>
+</ul>
+
+<h3>14.2 Продавец</h3>
+<ul>
+<li>Дашборд, управление товарами, <b>импорт из CSV</b>, склад и движения остатков, варианты/атрибуты.</li>
+<li>Заказы и суб-заказы, возвраты, споры со стороны продавца.</li>
+<li><b>Аналитика продаж</b>, отзывы на товары и ответы на них.</li>
+<li>Маркетинг: собственные промокоды, <b>флеш-распродажи</b>, акции и наборы (bundle), <b>платное продвижение</b>
+с рекламным кошельком.</li>
+<li>Финансы: вывод средств, тариф и комиссия (подписки продавца), налоговые реквизиты и режим (СНО).</li>
+<li><b>Сотрудники магазина</b> (роли внутри магазина), <b>KYC / доверие / VIP</b>.</li>
+<li><b>Академия продавца</b> (обучающие курсы для продавцов), конструктор курсов, шаблоны чата и часы работы.</li>
+</ul>
+
+<h3>14.3 Модератор / Администратор</h3>
+<ul>
+<li>Управление пользователями и магазинами (360°-карточки), верификация продавцов.</li>
+<li>Модерация товаров и очередь модерации, категории, отзывы, жалобы.</li>
+<li>Заказы, <b>выплаты</b>, <b>фискальные чеки</b>, <b>реконсиляция</b> платежей.</li>
+<li>Маркетинг платформы: купоны, баннеры, рассылки, сертификаты, уровни лояльности, рефералы.</li>
+<li>Настройки платформы, тарифы, платные возможности, валюты, <b>feature-flags</b>, SMS.</li>
+<li>Аналитика платформы, <b>когорты и LTV</b>, метрики Grafana, журнал аудита.</li>
+</ul>
+
+<h3>14.4 Поддержка</h3>
+<ul>
+<li>Стол поддержки (тикеты с SLA и авто-назначением), <b>арбитраж споров</b> между покупателем и продавцом.</li>
+</ul>
+</section>
+
+<!-- ───────────────────────── 15. RECOMMENDATIONS ───────────────────────── -->
+<section class="pb">
+<h2 id="recommend">15. Рекомендации: что есть и что можно улучшить</h2>
+
+<h3>Что реализовано сильно</h3>
+<div class="rec">
+<ul>
+<li><b>Широта функционала</b>: физические + цифровые товары + LMS, полный цикл денег
+(оплата → фискализация → расщепление → выплаты → возвраты), богатый маркетинг.</li>
+<li><b>Чистая поэтапная миграция</b> монолита в сервисы на общей БД без переписывания импортов
+(общая библиотека <code>app</code>).</li>
+<li><b>Инфраструктура как код</b> целиком: Terraform + Ansible + CI/CD, воспроизводимый деплой в Yandex Cloud.</li>
+<li><b>Продуманная деградация</b> интеграций (S3/SMTP/поиск/SMS) — удобно для разработки.</li>
+<li><b>Разделение публичных/приватных хранилищ</b> и presigned-выдача цифровых товаров.</li>
+</ul>
+</div>
+
+<h3>Приоритетные улучшения</h3>
+
+<h4>Инфраструктура и эксплуатация</h4>
+<div class="warn">
+<ul>
+<li><b>HTTPS/TLS на edge</b> — сейчас публичный контур по HTTP. Терминировать TLS на Kong
+(wildcard-сертификат, включая поддомен продавца), включить HSTS.</li>
+<li><b>Закрыть Grafana</b> (сейчас анонимный доступ) и вынести мониторинг за аутентификацию.</li>
+<li>Строгая сборка фронтенда: сейчас прод собирается через <code>vite build</code> в обход
+<code>tsc</code> из-за оставшихся ошибок типов — починить типы и вернуть <code>tsc &amp;&amp; vite build</code>.</li>
+<li>Зафиксировать зависимости фронтенда (нет <code>package-lock.json</code> → CI использует
+<code>npm install</code>); перейти на <code>npm ci</code> для воспроизводимости.</li>
+<li>Секреты — вынести в управляемое хранилище (Yandex Lockbox / Vault) вместо инъекции через Ansible-inventory.</li>
+</ul>
+</div>
+
+<h4>Архитектура и данные</h4>
+<div class="warn">
+<ul>
+<li>Общая БД — узкое место при росте: ввести <b>схемы-на-сервис</b> и явные контракты, чтобы позже
+безболезненно разнести данные (движение к Варианту 2 и для фронта продавца).</li>
+<li>Единая монорепа-библиотека <code>app</code> связывает сервисы на уровне кода — по мере роста
+выделять доменные пакеты с версионированием.</li>
+<li>Добавить нагрузочное тестирование и явные индексы под тяжёлые аналитические запросы
+(когорты, реконсиляция).</li>
+</ul>
+</div>
+
+<h4>Качество и надёжность</h4>
+<div class="warn">
+<ul>
+<li>Расширить автотесты (сейчас минимальный pytest в CI) — контрактные тесты API и e2e ключевых
+сценариев (оплата, возврат, выдача цифрового товара).</li>
+<li>Идемпотентность платёжных вебхуков и повторных попыток выплат; сверка с ОФД/эквайрингом.</li>
+<li>Централизованное структурированное логирование + трассировка запросов между сервисами (trace-id через Kong).</li>
+</ul>
+</div>
+
+<h4>Продукт и рост (отложенный roadmap)</h4>
+<div class="rec">
+<p>Уже согласованы к постройке ближайшие пункты: рассрочка (BNPL), индивидуальные заказы, подарочная
+упаковка/сертификаты, Академия продавца, расширенные отзывы (видео, бейдж проверенной покупки, галерея).
+<b>Отложено</b> (рекомендуется вернуться после):</p>
+<ul>
+<li><b>AI-слой</b>: чат-бот поддержки, авто-генерация описаний/тегов, семантический/визуальный поиск,
+персональная лента.</li>
+<li><b>Рекламный кабинет продавца</b> с аналитикой ставок/охвата/ROI, A/B-тесты карточек, прогноз спроса.</li>
+<li><b>Live-шопинг</b> и короткие видео (reels).</li>
+<li><b>Платная подписка</b> покупателя (бесплатная доставка + привилегии) на базе лояльности.</li>
+<li><b>Escrow-бейдж</b> (выплата при завершении заказа ≈ escrow — сделать это явным преимуществом).</li>
+<li><b>Fulfilment-light</b> (склад маркетплейса, консолидированная доставка).</li>
+<li><b>Мобильные приложения / PWA</b>.</li>
+<li><b>B2B-режим</b> (прайс-листы, счета, опт) и <b>трансграничная торговля</b> (i18n-контент, таможня, мультивалютные расчёты).</li>
+</ul>
+</div>
+
+<h4>UX и мелочи</h4>
+<ul>
+<li>Единый onboarding продавца (KYC → реквизиты → тариф) как пошаговый мастер.</li>
+<li>Сквозной поиск и подсказки на витрине через Meilisearch (включить в проде).</li>
+<li>Доступность (a11y) и мобильная адаптация ключевых экранов чекаута и кабинета продавца.</li>
+</ul>
+</section>
+
+<footer>🪵 Маркетплейс — техническая и функциональная документация · сгенерировано автоматически · Июль 2026</footer>
+
+</body>
+</html>
