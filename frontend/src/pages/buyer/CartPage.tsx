@@ -89,7 +89,7 @@ export default function CartPage() {
                     </div>
                   </div>
                   <div style={{ textAlign: 'right' }}>
-                    <Text strong style={{ color: '#f97316', fontSize: 18 }}>
+                    <Text strong style={{ color: '#b45309', fontSize: 18 }}>
                       {(parseFloat(item.product.price) * item.quantity).toLocaleString('ru')} ₽
                     </Text>
                     <br />
@@ -130,7 +130,7 @@ export default function CartPage() {
           )}
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 24 }}>
             <Text strong style={{ fontSize: 18 }}>Итого:</Text>
-            <Text strong style={{ fontSize: 18, color: '#f97316' }}>
+            <Text strong style={{ fontSize: 18, color: '#b45309' }}>
               {(promo ? Number(promo.estimated_total) : totalPrice()).toLocaleString('ru')} ₽
             </Text>
           </div>

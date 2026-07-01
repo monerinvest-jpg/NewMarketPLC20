@@ -31,7 +31,7 @@ export default function RecommendationRow({
                   }
                 >
                   <Text ellipsis style={{ display: 'block', fontSize: 13, marginBottom: 4 }}>{p.title}</Text>
-                  <Text strong style={{ color: '#f97316' }}>{parseFloat(p.price).toLocaleString('ru')} ₽</Text>
+                  <Text strong style={{ color: '#b45309' }}>{parseFloat(p.price).toLocaleString('ru')} ₽</Text>
                 </Card>
               </Link>
             </Col>

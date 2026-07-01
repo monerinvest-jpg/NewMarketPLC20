@@ -29,7 +29,7 @@ export default function SellerAnalyticsPage() {
           <Card><Statistic title="Заработано всего" value={data.total_earned} suffix="₽" valueStyle={{ color: '#3f8600' }} /></Card>
         </Col>
         <Col xs={24} sm={8}>
-          <Card><Statistic title="Текущий баланс" value={data.current_balance} suffix="₽" valueStyle={{ color: '#f97316' }} /></Card>
+          <Card><Statistic title="Текущий баланс" value={data.current_balance} suffix="₽" valueStyle={{ color: '#b45309' }} /></Card>
         </Col>
       </Row>
 
@@ -43,7 +43,7 @@ export default function SellerAnalyticsPage() {
               <XAxis dataKey="day" tick={{ fontSize: 11 }} />
               <YAxis tick={{ fontSize: 11 }} />
               <Tooltip formatter={(v: number) => `${v.toLocaleString('ru')} ₽`} />
-              <Line type="monotone" dataKey="revenue" stroke="#f97316" strokeWidth={2} name="Выручка" />
+              <Line type="monotone" dataKey="revenue" stroke="#b45309" strokeWidth={2} name="Выручка" />
             </LineChart>
           </ResponsiveContainer>
         )}
@@ -61,7 +61,7 @@ export default function SellerAnalyticsPage() {
                   <XAxis dataKey="title" tick={{ fontSize: 10 }} interval={0} angle={-15} textAnchor="end" height={60} />
                   <YAxis tick={{ fontSize: 11 }} />
                   <Tooltip />
-                  <Bar dataKey="qty" fill="#f97316" name="Продано шт." />
+                  <Bar dataKey="qty" fill="#b45309" name="Продано шт." />
                 </BarChart>
               </ResponsiveContainer>
             </Col>

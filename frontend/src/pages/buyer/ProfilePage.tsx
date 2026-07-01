@@ -96,7 +96,7 @@ export default function ProfilePage() {
           </Descriptions.Item>
           {user.role === 'seller' && (
             <Descriptions.Item label="Баланс продавца">
-              <Text strong style={{ color: '#f97316' }}>{parseFloat(user.balance).toLocaleString('ru')} ₽</Text>
+              <Text strong style={{ color: '#b45309' }}>{parseFloat(user.balance).toLocaleString('ru')} ₽</Text>
             </Descriptions.Item>
           )}
         </Descriptions>

@@ -383,7 +383,7 @@ export default function CheckoutPage() {
           <Divider />
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
             <Text strong style={{ fontSize: 18 }}>Итого:</Text>
-            <Text strong style={{ fontSize: 18, color: '#f97316' }}>
+            <Text strong style={{ fontSize: 18, color: '#b45309' }}>
               {total.toLocaleString('ru')} ₽
             </Text>
           </div>

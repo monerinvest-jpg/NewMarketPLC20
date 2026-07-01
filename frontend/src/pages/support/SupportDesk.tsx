@@ -159,7 +159,7 @@ export default function SupportDesk() {
               <div style={{ maxHeight: 360, overflowY: 'auto', marginBottom: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {active.messages?.map((m) => (
                   <div key={m.id} style={{ alignSelf: m.is_staff ? 'flex-end' : 'flex-start', maxWidth: '80%' }}>
-                    <div style={{ padding: '8px 12px', borderRadius: 12, background: m.is_staff ? '#f97316' : '#f1f5f9', color: m.is_staff ? '#fff' : '#0f172a' }}>
+                    <div style={{ padding: '8px 12px', borderRadius: 12, background: m.is_staff ? '#b45309' : '#f1f5f9', color: m.is_staff ? '#fff' : '#0f172a' }}>
                       {m.text}
                     </div>
                     <Text type="secondary" style={{ fontSize: 11 }}>{m.is_staff ? 'Поддержка' : 'Клиент'} · {dayjs(m.created_at).format('DD.MM HH:mm')}</Text>

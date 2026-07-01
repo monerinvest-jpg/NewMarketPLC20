@@ -72,7 +72,7 @@ export default function ChatPage() {
                   onClick={() => setActiveId(t.id)}
                 >
                   <List.Item.Meta
-                    avatar={<Avatar style={{ background: '#f97316' }}>{t.other_name[0]}</Avatar>}
+                    avatar={<Avatar style={{ background: '#b45309' }}>{t.other_name[0]}</Avatar>}
                     title={
                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                         <Text style={{ fontSize: 14 }}>{t.other_name}</Text>
@@ -97,7 +97,7 @@ export default function ChatPage() {
                   <div key={m.id} style={{ display: 'flex', justifyContent: mine ? 'flex-end' : 'flex-start', marginBottom: 8 }}>
                     <div style={{
                       maxWidth: '70%', padding: '8px 12px', borderRadius: 12,
-                      background: mine ? '#f97316' : '#f0f0f0',
+                      background: mine ? '#b45309' : '#f0f0f0',
                       color: mine ? '#fff' : '#000',
                     }}>
                       <div>{m.text}</div>

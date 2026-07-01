@@ -50,7 +50,7 @@ export default function FavoritesPage() {
                 <Link to={`/products/${p.id}`}>
                   <Text ellipsis style={{ display: 'block' }}>{p.title}</Text>
                 </Link>
-                <Text strong style={{ color: '#f97316' }}>{parseFloat(p.price).toLocaleString('ru')} ₽</Text>
+                <Text strong style={{ color: '#b45309' }}>{parseFloat(p.price).toLocaleString('ru')} ₽</Text>
               </Card>
             </Col>
           )

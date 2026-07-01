@@ -236,7 +236,7 @@ export default function ProductPage() {
                 onClick={() => setSelectedImage(img.url)}
                 style={{
                   width: 64, height: 64, objectFit: 'cover', borderRadius: 8, cursor: 'pointer',
-                  border: selectedImage === img.url ? '2px solid #f97316' : '1px solid #eee',
+                  border: selectedImage === img.url ? '2px solid #b45309' : '1px solid #eee',
                 }}
               />
             ))}
@@ -272,7 +272,7 @@ export default function ProductPage() {
               )}
             </div>
           ) : (
-            <Title level={2} style={{ color: '#f97316', margin: '16px 0' }}>
+            <Title level={2} style={{ color: '#b45309', margin: '16px 0' }}>
               {currentPrice.toLocaleString('ru')} ₽
               {product.compare_at_price && (
                 <Text delete type="secondary" style={{ fontSize: 18, marginLeft: 12 }}>
@@ -515,7 +515,7 @@ export default function ProductPage() {
                           <div style={{ marginTop: 8, marginLeft: 48, display: 'flex', alignItems: 'center', gap: 8 }}>
                             <Button
                               size="small" type="text"
-                              icon={r.voted_by_me ? <LikeFilled style={{ color: '#f97316' }} /> : <LikeOutlined />}
+                              icon={r.voted_by_me ? <LikeFilled style={{ color: '#b45309' }} /> : <LikeOutlined />}
                               onClick={() => handleVote(r.id)}
                             >
                               Полезно {r.helpful_count > 0 ? `(${r.helpful_count})` : ''}
@@ -524,9 +524,9 @@ export default function ProductPage() {
                           {r.reply && (
                             <div style={{
                               marginTop: 8, marginLeft: 48, padding: 12,
-                              background: '#fff7ed', borderRadius: 8, borderLeft: '3px solid #f97316',
+                              background: '#fff7ed', borderRadius: 8, borderLeft: '3px solid #b45309',
                             }}>
-                              <Text strong style={{ fontSize: 13, color: '#ea580c' }}>Ответ продавца</Text>
+                              <Text strong style={{ fontSize: 13, color: '#92400e' }}>Ответ продавца</Text>
                               <Paragraph style={{ marginBottom: 0, marginTop: 4, fontSize: 13 }}>{r.reply.text}</Paragraph>
                             </div>
                           )}
@@ -609,7 +609,7 @@ export default function ProductPage() {
                   </div>
                   <div style={{ marginTop: 12, display: 'flex', alignItems: 'baseline', gap: 8 }}>
                     <Text delete type="secondary">{Number(b.list_price).toLocaleString('ru')} ₽</Text>
-                    <Text strong style={{ fontSize: 18, color: '#f97316' }}>{Number(b.bundle_price).toLocaleString('ru')} ₽</Text>
+                    <Text strong style={{ fontSize: 18, color: '#b45309' }}>{Number(b.bundle_price).toLocaleString('ru')} ₽</Text>
                   </div>
                   <Button type="primary" style={{ marginTop: 12 }} onClick={async () => {
                     for (const it of b.items) { await addItem(it.product_id, it.quantity) }
@@ -639,7 +639,7 @@ export default function ProductPage() {
                       cover={<div style={{ height: 160, overflow: 'hidden' }}>{img && <img src={img.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}</div>}
                     >
                       <Text ellipsis style={{ display: 'block', fontSize: 13 }}>{rec.title}</Text>
-                      <Text strong style={{ color: '#f97316' }}>{parseFloat(rec.price).toLocaleString('ru')} ₽</Text>
+                      <Text strong style={{ color: '#b45309' }}>{parseFloat(rec.price).toLocaleString('ru')} ₽</Text>
                     </Card>
                   </Link>
                 </Col>

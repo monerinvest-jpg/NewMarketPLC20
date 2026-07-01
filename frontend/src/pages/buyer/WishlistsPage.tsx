@@ -117,7 +117,7 @@ export default function WishlistsPage() {
                     <Link to={`/products/${item.product_id}`}>
                       <Text ellipsis style={{ fontSize: 13 }}>{item.product.title}</Text>
                     </Link>
-                    <div><Text strong style={{ color: '#f97316' }}>{parseFloat(item.product.price).toLocaleString('ru')} ₽</Text></div>
+                    <div><Text strong style={{ color: '#b45309' }}>{parseFloat(item.product.price).toLocaleString('ru')} ₽</Text></div>
                   </Card>
                 </Col>
               )

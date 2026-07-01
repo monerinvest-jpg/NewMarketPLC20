@@ -38,7 +38,7 @@ export default function AdminCohortAnalytics() {
       {/* LTV */}
       <Row gutter={16} style={{ marginBottom: 24 }}>
         <Col xs={24} sm={8}>
-          <Card><Statistic title="Средний LTV покупателя" value={ltv?.avg_ltv || 0} suffix="₽" valueStyle={{ color: '#f97316' }} /></Card>
+          <Card><Statistic title="Средний LTV покупателя" value={ltv?.avg_ltv || 0} suffix="₽" valueStyle={{ color: '#b45309' }} /></Card>
         </Col>
         <Col xs={24} sm={8}>
           <Card><Statistic title="Среднее число заказов" value={ltv?.avg_orders || 0} precision={2} /></Card>
@@ -59,7 +59,7 @@ export default function AdminCohortAnalytics() {
                   <Text strong>{s.count.toLocaleString('ru')} ({s.percent}%)</Text>
                 </div>
                 <div style={{ background: '#f0f0f0', borderRadius: 6, overflow: 'hidden', height: 24 }}>
-                  <div style={{ width: `${s.percent}%`, height: '100%', background: '#f97316', transition: 'width .4s' }} />
+                  <div style={{ width: `${s.percent}%`, height: '100%', background: '#b45309', transition: 'width .4s' }} />
                 </div>
               </div>
             ))}

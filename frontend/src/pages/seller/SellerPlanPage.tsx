@@ -115,7 +115,7 @@ export default function SellerPlanPage() {
               <Card
                 style={{
                   marginBottom: 16,
-                  border: isCurrent ? '2px solid #f97316' : undefined,
+                  border: isCurrent ? '2px solid #b45309' : undefined,
                   height: '100%',
                 }}
               >
@@ -125,7 +125,7 @@ export default function SellerPlanPage() {
                   <Statistic
                     value={price}
                     suffix="₽/мес"
-                    valueStyle={{ color: price === 0 ? '#52c41a' : '#f97316' }}
+                    valueStyle={{ color: price === 0 ? '#52c41a' : '#b45309' }}
                   />
                 </div>
                 <div style={{ marginBottom: 12 }}>

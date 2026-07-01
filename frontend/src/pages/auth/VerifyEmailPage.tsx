@@ -65,7 +65,7 @@ export default function VerifyEmailPage() {
     <div style={{ maxWidth: 480, margin: '60px auto' }}>
       <Card>
         <div style={{ textAlign: 'center', marginBottom: 24 }}>
-          <MailOutlined style={{ fontSize: 48, color: '#f97316' }} />
+          <MailOutlined style={{ fontSize: 48, color: '#b45309' }} />
           <Title level={3} style={{ marginTop: 16 }}>Подтверждение email</Title>
           <Text type="secondary">
             Мы отправили 6-значный код на вашу почту. Введите его ниже.

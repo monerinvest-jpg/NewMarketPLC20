@@ -39,7 +39,7 @@ export default function DisputeThread({
             </div>
           ) : (
             <div key={m.id} style={{ alignSelf: mine(m.sender_role) ? 'flex-end' : 'flex-start', maxWidth: '80%' }}>
-              <div style={{ padding: '8px 12px', borderRadius: 12, background: mine(m.sender_role) ? '#f97316' : '#f1f5f9', color: mine(m.sender_role) ? '#fff' : '#0f172a' }}>
+              <div style={{ padding: '8px 12px', borderRadius: 12, background: mine(m.sender_role) ? '#b45309' : '#f1f5f9', color: mine(m.sender_role) ? '#fff' : '#0f172a' }}>
                 {m.text}
               </div>
               <Text type="secondary" style={{ fontSize: 11 }}>{roleLabel[m.sender_role] || m.sender_role} · {dayjs(m.created_at).format('DD.MM HH:mm')}</Text>

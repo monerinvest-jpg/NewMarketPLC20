@@ -24,7 +24,7 @@ export default function AdminReconciliation() {
 
       <Row gutter={16} style={{ marginTop: 16, marginBottom: 16 }}>
         <Col xs={24} sm={8}>
-          <Card><Statistic title="Валовые продажи (GMV)" value={data.gross_sales} formatter={() => money(data.gross_sales)} valueStyle={{ color: '#f97316' }} /></Card>
+          <Card><Statistic title="Валовые продажи (GMV)" value={data.gross_sales} formatter={() => money(data.gross_sales)} valueStyle={{ color: '#b45309' }} /></Card>
         </Col>
         <Col xs={24} sm={8}>
           <Card><Statistic title="Комиссия платформы" value={data.platform_commission} formatter={() => money(data.platform_commission)} valueStyle={{ color: '#237804' }} /></Card>

@@ -67,7 +67,7 @@ export default function OrdersPage() {
                 <div style={{ textAlign: 'right' }}>
                   <Tag color={statusColors[order.status]}>{statusLabels[order.status]}</Tag>
                   <br />
-                  <Text strong style={{ fontSize: 16, color: '#f97316' }}>
+                  <Text strong style={{ fontSize: 16, color: '#b45309' }}>
                     {parseFloat(order.total_price).toLocaleString('ru')} ₽
                   </Text>
                 </div>

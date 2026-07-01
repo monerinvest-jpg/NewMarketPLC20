@@ -9,14 +9,14 @@ const { Title, Text } = Typography
 export default function SellerShopSettings() {
   const [shop, setShop] = useState<Shop | null>(null)
   const [loading, setLoading] = useState(false)
-  const [accentColor, setAccentColor] = useState('#f97316')
+  const [accentColor, setAccentColor] = useState('#b45309')
   const [form] = Form.useForm()
 
   useEffect(() => {
     shopsApi.getMy().then((s) => {
       setShop(s)
       form.setFieldsValue(s)
-      setAccentColor(s.accent_color || '#f97316')
+      setAccentColor(s.accent_color || '#b45309')
     })
   }, [])
 

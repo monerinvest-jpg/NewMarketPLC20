@@ -54,7 +54,7 @@ export default function GiftCertificatesPage() {
       <Row gutter={16}>
         <Col xs={24} md={8}>
           <Card>
-            <Statistic title="Промо-баланс" value={`${Number(data?.promo_balance || 0).toLocaleString('ru')} ₽`} valueStyle={{ color: '#f97316' }} />
+            <Statistic title="Промо-баланс" value={`${Number(data?.promo_balance || 0).toLocaleString('ru')} ₽`} valueStyle={{ color: '#b45309' }} />
             <Paragraph type="secondary" style={{ marginTop: 8, fontSize: 12 }}>
               Промо-баланс автоматически списывается при оформлении заказа.
             </Paragraph>

@@ -16,7 +16,7 @@ function ProductCard({ product }: { product: Product }) {
           {img && <img src={img.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
         </div>}>
         <Text ellipsis style={{ display: 'block', fontSize: 13 }}>{product.title}</Text>
-        <Text strong style={{ color: '#f97316' }}>{parseFloat(product.price).toLocaleString('ru')} ₽</Text>
+        <Text strong style={{ color: '#b45309' }}>{parseFloat(product.price).toLocaleString('ru')} ₽</Text>
       </Card>
     </Link>
   )

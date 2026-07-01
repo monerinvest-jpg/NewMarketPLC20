@@ -11,6 +11,7 @@ import { useCurrencyStore } from '@/store/currencyStore'
 import { currencyApi } from '@/api'
 import { useAuthStore } from '@/store/authStore'
 import { useCartStore } from '@/store/cartStore'
+import { useFavoritesStore } from '@/store/favoritesStore'
 import { sellerOrigin } from '@/lib/sellerHost'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -34,6 +35,8 @@ export default function MainLayout() {
   useEffect(() => {
     // Guests get a local cart; authenticated users get the server cart.
     fetchCart()
+    // Warm the favorite-ids cache so product-card hearts render correctly.
+    if (user) useFavoritesStore.getState().load()
   }, [user])
 
   useEffect(() => {
@@ -159,7 +162,7 @@ export default function MainLayout() {
             </Link>
             {user ? (
               <Dropdown menu={{ items: userMenuItems }} placement="bottomRight">
-                <Avatar size="small" style={{ background: '#f97316', cursor: 'pointer' }}>
+                <Avatar size="small" style={{ background: '#b45309', cursor: 'pointer' }}>
                   {user.full_name[0]?.toUpperCase()}
                 </Avatar>
               </Dropdown>
@@ -188,12 +191,8 @@ export default function MainLayout() {
             <Button type="text">{t('nav.catalog')}</Button>
           </Link>
 
-          <Select
-            value={i18n.language?.startsWith('en') ? 'en' : 'ru'}
-            onChange={(lng) => i18n.changeLanguage(lng)}
-            size="small" style={{ width: 72 }}
-            options={[{ value: 'ru', label: '🇷🇺 RU' }, { value: 'en', label: '🇬🇧 EN' }]}
-          />
+          {/* Language switcher hidden until the whole storefront is translated —
+              a EN header over Russian pages only misleads. i18n stays wired. */}
 
           {user ? (
             <>
@@ -219,7 +218,7 @@ export default function MainLayout() {
                 </Badge>
               </Link>
               <Dropdown menu={{ items: userMenuItems }} placement="bottomRight">
-                <Avatar style={{ background: '#f97316', cursor: 'pointer' }}>
+                <Avatar style={{ background: '#b45309', cursor: 'pointer' }}>
                   {user.full_name[0]?.toUpperCase()}
                 </Avatar>
               </Dropdown>
@@ -249,14 +248,8 @@ export default function MainLayout() {
         width={300}
         styles={{ body: { padding: 0 } }}
       >
-        <div style={{ display: 'flex', gap: 8, padding: '12px 16px', borderBottom: '1px solid #f0f0f0' }}>
-          <Select
-            value={i18n.language?.startsWith('en') ? 'en' : 'ru'}
-            onChange={(lng) => i18n.changeLanguage(lng)}
-            size="small" style={{ width: 88 }}
-            options={[{ value: 'ru', label: '🇷🇺 RU' }, { value: 'en', label: '🇬🇧 EN' }]}
-          />
-          {user && (
+        {user && (
+          <div style={{ display: 'flex', gap: 8, padding: '12px 16px', borderBottom: '1px solid #f0f0f0' }}>
             <Select
               value={currentCurrency}
               onChange={setCurrent}
@@ -264,8 +257,8 @@ export default function MainLayout() {
               style={{ width: 92 }}
               options={rates.map((r) => ({ value: r.code, label: `${r.symbol} ${r.code}` }))}
             />
-          )}
-        </div>
+          </div>
+        )}
         <Menu
           mode="inline"
           selectable={false}

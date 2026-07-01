@@ -24,7 +24,7 @@ export default function LoyaltyPage() {
     <div style={{ maxWidth: 900, margin: '0 auto', padding: 24 }}>
       <Title level={3}><CrownOutlined /> Программа лояльности</Title>
 
-      <Card style={{ marginBottom: 16, borderTop: `4px solid ${cur?.color || '#f97316'}` }}>
+      <Card style={{ marginBottom: 16, borderTop: `4px solid ${cur?.color || '#b45309'}` }}>
         <Row gutter={16} align="middle">
           <Col xs={24} md={8}>
             <Text type="secondary">Ваш уровень</Text>
@@ -37,7 +37,7 @@ export default function LoyaltyPage() {
             {next ? (
               <div style={{ marginTop: 12 }}>
                 <Text type="secondary">До уровня «{next.name}»: {Number(status.to_next_amount).toLocaleString('ru')} ₽</Text>
-                <Progress percent={progressPct} strokeColor={next.color || '#f97316'} />
+                <Progress percent={progressPct} strokeColor={next.color || '#b45309'} />
               </div>
             ) : (
               <Tag color="gold" style={{ marginTop: 12 }}>Максимальный уровень достигнут 🎉</Tag>

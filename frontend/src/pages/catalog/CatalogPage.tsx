@@ -1,16 +1,13 @@
 import { useEffect, useState } from 'react'
-import { Link, useSearchParams, useNavigate } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import {
   Row, Col, Card, Slider, Select, Input, Pagination,
-  Typography, Button, Spin, Empty, Rate, Drawer, Grid, Badge
+  Typography, Button, Empty, Drawer, Grid, Badge
 } from 'antd'
-import { ShoppingCartOutlined, SwapOutlined, FilterOutlined } from '@ant-design/icons'
+import { FilterOutlined } from '@ant-design/icons'
 import { productsApi, categoriesApi, facetsApi } from '@/api'
 import type { Product, Category, CatalogFacet } from '@/types'
-import { useCartStore } from '@/store/cartStore'
-import { useAuthStore } from '@/store/authStore'
-import { useCompareStore } from '@/store/compareStore'
-import { message } from 'antd'
+import ProductCard, { ProductGridSkeleton } from '@/components/common/ProductCard'
 
 const { Title, Text } = Typography
 
@@ -20,14 +17,14 @@ export default function CatalogPage() {
   const [categories, setCategories] = useState<Category[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
-  const { addItem } = useCartStore()
-  const { user } = useAuthStore()
-  const compare = useCompareStore()
 
   const page = parseInt(searchParams.get('page') || '1')
   const q = searchParams.get('q') || ''
   const categoryId = searchParams.get('category_id') || ''
   const sort = searchParams.get('sort') || 'created_at_desc'
+  // priceDraft follows the slider handles live; priceRange (the one queries use)
+  // is only committed on release — otherwise every dragged pixel fires the API.
+  const [priceDraft, setPriceDraft] = useState<[number, number]>([0, 100000])
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 100000])
   const [facets, setFacets] = useState<CatalogFacet[]>([])
   const [selectedAttrs, setSelectedAttrs] = useState<Record<number, string>>({})
@@ -78,17 +75,6 @@ export default function CatalogPage() {
     setSearchParams(p)
   }
 
-  const handleAddToCart = async (e: React.MouseEvent, productId: number) => {
-    e.preventDefault()
-    // Guests can add too — the cart store keeps a local copy until login.
-    try {
-      await addItem(productId)
-      message.success('Добавлено в корзину')
-    } catch {
-      message.error('Ошибка')
-    }
-  }
-
   // Shared filter controls — desktop sidebar Card and the mobile Drawer render the same content.
   const filtersContent = (
     <>
@@ -108,13 +94,14 @@ export default function CatalogPage() {
             <Slider
               range
               min={0} max={100000} step={100}
-              value={priceRange}
-              onChange={(v) => setPriceRange(v as [number, number])}
+              value={priceDraft}
+              onChange={(v) => setPriceDraft(v as [number, number])}
+              onChangeComplete={(v) => setPriceRange(v as [number, number])}
               tooltip={{ formatter: (v) => `${v?.toLocaleString('ru')} ₽` }}
             />
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <Text type="secondary">{priceRange[0].toLocaleString('ru')} ₽</Text>
-              <Text type="secondary">{priceRange[1].toLocaleString('ru')} ₽</Text>
+              <Text type="secondary">{priceDraft[0].toLocaleString('ru')} ₽</Text>
+              <Text type="secondary">{priceDraft[1].toLocaleString('ru')} ₽</Text>
             </div>
           </div>
 
@@ -196,82 +183,17 @@ export default function CatalogPage() {
         </div>
 
         {loading ? (
-          <Spin style={{ display: 'block', textAlign: 'center', margin: 80 }} />
+          <ProductGridSkeleton count={9} colProps={{ xs: 12, sm: 12, md: 12, lg: 8 }} />
         ) : products.length === 0 ? (
           <Empty description="Товары не найдены" />
         ) : (
           <>
             <Row gutter={[16, 16]}>
-              {products.map((p) => {
-                const img = p.images.find((i) => i.is_main) || p.images[0]
-                return (
-                  <Col key={p.id} xs={12} sm={12} lg={8}>
-                    <Link to={`/products/${p.id}`}>
-                      <Card
-                        hoverable className="product-card" style={{ position: 'relative' }}
-                        cover={
-                          <div style={{ height: 180, background: '#f5f5f5', overflow: 'hidden' }}>
-                            {img ? (
-                              <img src={img.url} alt={p.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                            ) : (
-                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', fontSize: 40 }}>🛍️</div>
-                            )}
-                          </div>
-                        }
-                        bodyStyle={{ padding: '12px' }}
-                        actions={[
-                          <Button
-                            key="cart" type="primary" icon={<ShoppingCartOutlined />} size="small"
-                            onClick={(e) => handleAddToCart(e, p.id)}
-                          >
-                            В корзину
-                          </Button>
-                        ]}
-                      >
-                        <Text ellipsis={{ tooltip: p.title }} style={{ display: 'block', marginBottom: 4 }}>
-                          {p.title}
-                        </Text>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                          {p.flash_price ? (
-                            <>
-                              <Text strong style={{ color: '#cf1322', fontSize: 16 }}>
-                                {parseFloat(p.flash_price).toLocaleString('ru')} ₽
-                              </Text>
-                              <Text delete type="secondary" style={{ fontSize: 12 }}>
-                                {parseFloat(p.price).toLocaleString('ru')} ₽
-                              </Text>
-                            </>
-                          ) : (
-                            <>
-                              <Text strong style={{ color: '#f97316', fontSize: 16 }}>
-                                {parseFloat(p.price).toLocaleString('ru')} ₽
-                              </Text>
-                              {p.compare_at_price && (
-                                <Text delete type="secondary" style={{ fontSize: 12 }}>
-                                  {parseFloat(p.compare_at_price).toLocaleString('ru')} ₽
-                                </Text>
-                              )}
-                            </>
-                          )}
-                        </div>
-                        {p.rating > 0 && (
-                          <Rate disabled defaultValue={parseFloat(p.rating)} allowHalf style={{ fontSize: 12 }} />
-                        )}
-                        <Button
-                          size="small" type="text" icon={<SwapOutlined />}
-                          style={{ position: 'absolute', top: 8, right: 8, background: 'rgba(255,255,255,0.85)' }}
-                          onClick={(e) => {
-                            e.preventDefault()
-                            compare.toggle(p)
-                            message.success(compare.has(p.id) ? 'Убрано из сравнения' : 'Добавлено к сравнению')
-                          }}
-                          title="Сравнить"
-                        />
-                      </Card>
-                    </Link>
-                  </Col>
-                )
-              })}
+              {products.map((p) => (
+                <Col key={p.id} xs={12} sm={12} lg={8}>
+                  <ProductCard product={p} coverHeight={180} />
+                </Col>
+              ))}
             </Row>
             <Pagination
               current={page}

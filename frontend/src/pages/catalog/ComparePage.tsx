@@ -36,7 +36,7 @@ export default function ComparePage() {
       key: 'price', label: 'Цена',
       render: (pid: number) => {
         const p = items.find((x) => x.id === pid)!
-        return <Text strong style={{ color: '#f97316' }}>{parseFloat(p.price).toLocaleString('ru')} ₽</Text>
+        return <Text strong style={{ color: '#b45309' }}>{parseFloat(p.price).toLocaleString('ru')} ₽</Text>
       },
     },
     {

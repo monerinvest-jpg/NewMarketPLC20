@@ -59,17 +59,17 @@ export default function ShopPage() {
           background: `url(${shop.banner_url}) center/cover`,
         }} />
       )}
-      <Card style={{ marginBottom: 24, borderTop: `3px solid ${shop.accent_color || '#f97316'}` }}>
+      <Card style={{ marginBottom: 24, borderTop: `3px solid ${shop.accent_color || '#b45309'}` }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
             {shop.logo_url ? (
               <img src={shop.logo_url} alt={shop.name} style={{ width: 64, height: 64, borderRadius: 12, objectFit: 'cover' }} />
             ) : (
               <div style={{
-                width: 64, height: 64, borderRadius: 12, background: `${shop.accent_color || '#f97316'}22`,
+                width: 64, height: 64, borderRadius: 12, background: `${shop.accent_color || '#b45309'}22`,
                 display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28,
               }}>
-                <ShopOutlined style={{ color: shop.accent_color || '#f97316' }} />
+                <ShopOutlined style={{ color: shop.accent_color || '#b45309' }} />
               </div>
             )}
             <div>
@@ -149,7 +149,7 @@ export default function ShopPage() {
                 return (
                   <div key={star} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <Text style={{ width: 28 }}>{star}★</Text>
-                    <Progress percent={pct} showInfo={false} strokeColor="#f97316" style={{ flex: 1, margin: 0 }} />
+                    <Progress percent={pct} showInfo={false} strokeColor="#b45309" style={{ flex: 1, margin: 0 }} />
                     <Text type="secondary" style={{ width: 36, textAlign: 'right' }}>{cnt}</Text>
                   </div>
                 )
@@ -178,7 +178,7 @@ export default function ShopPage() {
                     }
                   >
                     <Text ellipsis style={{ display: 'block' }}>{p.title}</Text>
-                    <Text strong style={{ color: '#f97316' }}>{parseFloat(p.price).toLocaleString('ru')} ₽</Text>
+                    <Text strong style={{ color: '#b45309' }}>{parseFloat(p.price).toLocaleString('ru')} ₽</Text>
                   </Card>
                 </Link>
               </Col>

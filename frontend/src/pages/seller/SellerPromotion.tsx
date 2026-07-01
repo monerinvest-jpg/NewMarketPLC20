@@ -87,7 +87,7 @@ export default function SellerPromotion() {
         <Card style={{ marginBottom: 24 }}>
           <Row gutter={16} align="middle">
             <Col xs={24} md={6}>
-              <Statistic title="Рекламный кошелёк" value={`${Number(wallet.ad_balance).toLocaleString('ru')} ₽`} valueStyle={{ color: '#f97316' }} />
+              <Statistic title="Рекламный кошелёк" value={`${Number(wallet.ad_balance).toLocaleString('ru')} ₽`} valueStyle={{ color: '#b45309' }} />
             </Col>
             <Col xs={24} md={18}>
               <Text type="secondary" style={{ display: 'block', marginBottom: 8 }}>Пополнить (списывается с основного баланса; крупные пакеты — с бонусом):</Text>

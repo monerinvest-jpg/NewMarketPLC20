@@ -61,7 +61,7 @@ export default function AdminPlatformAnalytics() {
               <YAxis yAxisId="left" tick={{ fontSize: 11 }} />
               <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} />
               <Tooltip />
-              <Line yAxisId="left" type="monotone" dataKey="revenue" stroke="#f97316" strokeWidth={2} name="Выручка ₽" />
+              <Line yAxisId="left" type="monotone" dataKey="revenue" stroke="#b45309" strokeWidth={2} name="Выручка ₽" />
               <Line yAxisId="right" type="monotone" dataKey="orders" stroke="#3f8600" strokeWidth={2} name="Заказы" />
             </LineChart>
           </ResponsiveContainer>
@@ -90,7 +90,7 @@ export default function AdminPlatformAnalytics() {
                   <XAxis dataKey="day" tick={{ fontSize: 10 }} />
                   <YAxis tick={{ fontSize: 11 }} />
                   <Tooltip />
-                  <Bar dataKey="count" fill="#f97316" name="Новые юзеры" />
+                  <Bar dataKey="count" fill="#b45309" name="Новые юзеры" />
                 </BarChart>
               </ResponsiveContainer>
             )}

@@ -105,11 +105,11 @@ export default function SellerReviews() {
                 {review.reply ? (
                   <div style={{
                     marginTop: 8, marginLeft: 48, padding: 12,
-                    background: '#fff7ed', borderRadius: 8, borderLeft: '3px solid #f97316',
+                    background: '#fff7ed', borderRadius: 8, borderLeft: '3px solid #b45309',
                   }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                       <div>
-                        <Text strong style={{ fontSize: 13, color: '#ea580c' }}>Ваш ответ</Text>
+                        <Text strong style={{ fontSize: 13, color: '#92400e' }}>Ваш ответ</Text>
                         <Paragraph style={{ marginBottom: 0, marginTop: 4, fontSize: 13 }}>{review.reply.text}</Paragraph>
                       </div>
                       <Popconfirm title="Удалить ответ?" onConfirm={() => handleDeleteReply(review.id)}>

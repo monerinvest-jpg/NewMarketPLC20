@@ -99,7 +99,7 @@ export default function SupportPage() {
                   <div key={m.id} style={{ alignSelf: m.is_staff ? 'flex-start' : 'flex-end', maxWidth: '78%' }}>
                     <div style={{
                       padding: '8px 12px', borderRadius: 12,
-                      background: m.is_staff ? '#f1f5f9' : '#f97316',
+                      background: m.is_staff ? '#f1f5f9' : '#b45309',
                       color: m.is_staff ? '#0f172a' : '#fff',
                     }}>
                       {m.text}

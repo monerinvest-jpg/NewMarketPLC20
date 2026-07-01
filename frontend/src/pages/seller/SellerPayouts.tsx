@@ -48,7 +48,7 @@ export default function SellerPayouts() {
 
       <Card style={{ marginBottom: 16 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Statistic title="Доступно к выводу" value={balance} suffix="₽" valueStyle={{ color: '#f97316' }} />
+          <Statistic title="Доступно к выводу" value={balance} suffix="₽" valueStyle={{ color: '#b45309' }} />
           <Button type="primary" disabled={balance <= 0} onClick={() => setModalOpen(true)}>Запросить вывод</Button>
         </div>
       </Card>

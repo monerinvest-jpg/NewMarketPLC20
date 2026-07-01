@@ -1,81 +1,13 @@
 import { useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { Row, Col, Card, Typography, Button, Spin, Tag } from 'antd'
-import { ShoppingCartOutlined, ArrowRightOutlined } from '@ant-design/icons'
+import { Link } from 'react-router-dom'
+import { Row, Col, Typography, Button, Tag } from 'antd'
+import { ArrowRightOutlined } from '@ant-design/icons'
 import { productsApi, categoriesApi, homeApi } from '@/api'
 import type { Product, Category } from '@/types'
-import { useCartStore } from '@/store/cartStore'
 import { useAuthStore } from '@/store/authStore'
-import { message } from 'antd'
+import ProductCard, { ProductGridSkeleton } from '@/components/common/ProductCard'
 
 const { Title, Text } = Typography
-
-function ProductCard({ product }: { product: Product }) {
-  const { addItem } = useCartStore()
-  const { user } = useAuthStore()
-  const mainImage = product.images.find((i) => i.is_main) || product.images[0]
-
-  const handleAddToCart = async (e: React.MouseEvent) => {
-    e.preventDefault()
-    // Guests can add too — the cart store keeps a local copy until login.
-    try {
-      await addItem(product.id)
-      message.success('Добавлено в корзину')
-    } catch {
-      message.error('Ошибка добавления в корзину')
-    }
-  }
-
-  return (
-    <Link to={`/products/${product.id}`}>
-      <Card
-        hoverable
-        className="product-card"
-        cover={
-          <div style={{ height: 200, overflow: 'hidden', background: '#f5f5f5' }}>
-            {mainImage ? (
-              <img
-                src={mainImage.url}
-                alt={product.title}
-                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-              />
-            ) : (
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', fontSize: 48 }}>
-                🛍️
-              </div>
-            )}
-          </div>
-        }
-        bodyStyle={{ padding: '12px 16px' }}
-      >
-        <Text ellipsis style={{ display: 'block', marginBottom: 4 }}>{product.title}</Text>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div>
-            <Text strong style={{ fontSize: 18, color: '#f97316' }}>
-              {parseFloat(product.price).toLocaleString('ru')} ₽
-            </Text>
-            {product.compare_at_price && (
-              <Text delete type="secondary" style={{ marginLeft: 8, fontSize: 13 }}>
-                {parseFloat(product.compare_at_price).toLocaleString('ru')} ₽
-              </Text>
-            )}
-          </div>
-          <Button
-            type="primary" size="small" icon={<ShoppingCartOutlined />}
-            onClick={handleAddToCart}
-          />
-        </div>
-        {product.rating > 0 && (
-          <div style={{ marginTop: 4 }}>
-            <Text type="secondary" style={{ fontSize: 12 }}>
-              ⭐ {product.rating} ({product.reviews_count})
-            </Text>
-          </div>
-        )}
-      </Card>
-    </Link>
-  )
-}
 
 export default function HomePage() {
   const [products, setProducts] = useState<Product[]>([])
@@ -117,7 +49,7 @@ export default function HomePage() {
     }
   }, [user])
 
-  if (loading) return <Spin size="large" style={{ display: 'block', textAlign: 'center', margin: 80 }} />
+  if (loading) return <ProductGridSkeleton count={8} colProps={{ xs: 24, sm: 12, md: 8, lg: 6 }} />
 
   return (
     <div>
@@ -145,7 +77,7 @@ export default function HomePage() {
 
       {/* Hero banner */}
       <div style={{
-        background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
+        background: 'linear-gradient(135deg, #b45309 0%, #92400e 100%)',
         borderRadius: 16, padding: '48px 40px', marginBottom: 40, color: '#fff',
       }}>
         <Title level={1} style={{ color: '#fff', margin: 0 }}>
@@ -155,7 +87,7 @@ export default function HomePage() {
           Handmade, эксклюзив и всё что делает жизнь лучше
         </Text>
         <Link to="/catalog">
-          <Button size="large" style={{ background: '#fff', color: '#f97316', border: 'none', fontWeight: 600 }}>
+          <Button size="large" style={{ background: '#fff', color: '#b45309', border: 'none', fontWeight: 600 }}>
             Перейти в каталог <ArrowRightOutlined />
           </Button>
         </Link>
@@ -216,7 +148,7 @@ export default function HomePage() {
               <Tag
                 style={{
                   padding: '8px 16px', fontSize: 14, cursor: 'pointer',
-                  border: '1px solid #f97316', color: '#f97316', background: '#fff7ed',
+                  border: '1px solid #b45309', color: '#b45309', background: '#fff7ed',
                   borderRadius: 20,
                 }}
               >
@@ -236,7 +168,7 @@ export default function HomePage() {
       </div>
       <Row gutter={[16, 16]}>
         {products.map((p) => (
-          <Col key={p.id} xs={24} sm={12} md={8} lg={6}>
+          <Col key={p.id} xs={12} sm={12} md={8} lg={6}>
             <ProductCard product={p} />
           </Col>
         ))}

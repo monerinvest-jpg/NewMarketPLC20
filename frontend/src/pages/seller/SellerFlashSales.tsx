@@ -76,7 +76,7 @@ export default function SellerFlashSales() {
                 render: (_, s) => (
                   <span>
                     <Text delete type="secondary">{s.base_price ? parseFloat(s.base_price).toLocaleString('ru') : '—'} ₽</Text>{' '}
-                    <Text strong style={{ color: '#f97316' }}>{s.effective_price ? parseFloat(s.effective_price).toLocaleString('ru') : '—'} ₽</Text>
+                    <Text strong style={{ color: '#b45309' }}>{s.effective_price ? parseFloat(s.effective_price).toLocaleString('ru') : '—'} ₽</Text>
                   </span>
                 ),
               },
