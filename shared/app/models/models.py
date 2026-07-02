@@ -635,6 +635,11 @@ class Product(Base):
     rating: Mapped[Decimal] = mapped_column(Numeric(3, 2), default=Decimal("0.00"), nullable=False)
     reviews_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     views_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    # Provenance for products imported from external platforms (e.g. VK Market):
+    # source='vk', external_id=<vk item id>. Re-import upserts by this pair
+    # instead of duplicating (see uq_product_shop_source_external).
+    source: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    external_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False)
 
@@ -657,6 +662,32 @@ class Product(Base):
         Index("ix_product_price", "price"),
         Index("ix_product_rating", "rating"),
         Index("ix_product_title", "title"),
+        UniqueConstraint("shop_id", "source", "external_id", name="uq_product_shop_source_external"),
+    )
+
+
+class ShopIntegration(Base):
+    """
+    A shop's connection to an external platform (VK for now): the OAuth token
+    and the linked community, so the seller can (re-)import their catalog.
+    One integration per (shop, provider).
+    """
+    __tablename__ = "shop_integration"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    shop_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("shop.id"), nullable=False)
+    provider: Mapped[str] = mapped_column(String(20), nullable=False, default="vk")
+    # OAuth access token of the SELLER (scope: market, groups, offline).
+    access_token: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    external_user_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    community_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    community_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    last_sync_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("shop_id", "provider", name="uq_shop_integration_shop_provider"),
     )
 
 

@@ -126,6 +126,14 @@ class Settings(BaseSettings):
     MEILI_URL: str = ""
     MEILI_KEY: str = ""
 
+    # VK Market import (optional — empty app id disables the integration UI).
+    # Register the app at dev.vk.com; the redirect URI must EXACTLY match the
+    # one configured there (HTTPS in production).
+    VK_APP_ID: str = ""
+    VK_APP_SECRET: str = ""
+    VK_REDIRECT_URI: str = ""  # e.g. https://<домен>/api/v1/seller/integrations/vk/callback
+    VK_API_VERSION: str = "5.199"
+
     # Caching (Redis). When enabled, hot read paths (categories, currency rates,
     # homepage) are cached. Falls back transparently if Redis is unreachable.
     CACHE_ENABLED: bool = True

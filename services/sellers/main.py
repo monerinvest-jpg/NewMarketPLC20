@@ -21,6 +21,7 @@ from app.api.v1.endpoints.promotions import (
 from app.api.v1.endpoints.disputes import seller_router as disputes_seller_router
 from app.api.v1.endpoints.academy import seller_router as academy_seller_router
 from app.api.v1.endpoints.custom_orders import seller_router as custom_seller_router
+from app.api.v1.endpoints.vk_integration import router as vk_integration_router
 
 app = create_service_app(
     "sellers",
@@ -35,5 +36,6 @@ app = create_service_app(
         disputes_seller_router,
         academy_seller_router,
         custom_seller_router,
+        vk_integration_router,
     ],
 )

@@ -18,6 +18,19 @@ import type {
   DigitalAsset, Entitlement, CourseDetail, MyCourse, QuizResult, Certificate,
 } from '@/types'
 
+// Normalized VK Market item (preview payload of the VK import).
+export interface VkMarketItem {
+  external_id: string
+  title: string
+  description: string
+  price: string
+  currency: string
+  available: boolean
+  sku: string
+  photo: string | null
+  photos: string[]
+}
+
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 export const authApi = {
   register: (data: {
@@ -86,6 +99,19 @@ export const productsApi = {
       categories: { id: number; name: string }[]
       shops: { id: number; name: string }[]
     }>('/products/suggest', { params: { q } }).then(r => r.data),
+
+  // VK Market import (seller cabinet)
+  vk: {
+    status: () => api.get<{ configured: boolean; connected: boolean; community_id: string | null; community_name: string | null; last_sync_at: string | null }>('/seller/integrations/vk/status').then(r => r.data),
+    authUrl: () => api.get<{ url: string }>('/seller/integrations/vk/auth-url').then(r => r.data),
+    communities: () => api.get<{ id: number; name: string; screen_name: string }[]>('/seller/integrations/vk/communities').then(r => r.data),
+    preview: (community_id: number) =>
+      api.post<{ items: VkMarketItem[]; count: number }>('/seller/integrations/vk/preview', { community_id }).then(r => r.data),
+    startImport: (p: { community_id: number; category_id: number; external_ids?: string[] }) =>
+      api.post<{ task_id: string }>('/seller/integrations/vk/import', p).then(r => r.data),
+    importStatus: (taskId: string) =>
+      api.get<{ state: string; result?: any; error?: string; progress?: { done: number; created: number; updated: number } }>(`/seller/integrations/vk/import/${taskId}`).then(r => r.data),
+  },
 
   importCsv: (file: File) => {
     const fd = new FormData()

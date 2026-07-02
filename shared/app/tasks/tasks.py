@@ -268,6 +268,41 @@ def rebuild_search_index():
     return asyncio.run(reindex_all_products())
 
 
+async def _import_vk_products_async(task, shop_id: int, community_id: int,
+                                    category_id: int, external_ids):
+    from app.models.models import Shop
+    from app.services import vk_import_service
+
+    async with AsyncSessionLocal() as db:
+        shop = await db.get(Shop, shop_id)
+        integration = await vk_import_service.get_integration(db, shop_id)
+        if not shop or not integration or not integration.access_token:
+            return {"error": "VK не подключён"}
+
+        def _progress(done, created, updated):
+            try:
+                task.update_state(state="PROGRESS",
+                                  meta={"done": done, "created": created, "updated": updated})
+            except Exception:
+                pass
+
+        result = await vk_import_service.import_products(
+            db, shop, integration.access_token, community_id, category_id,
+            external_ids, progress_cb=_progress,
+        )
+        integration.last_sync_at = datetime.now(timezone.utc)
+        await db.commit()
+        return result
+
+
+@celery_app.task(name="app.tasks.tasks.import_vk_products", bind=True)
+def import_vk_products(self, shop_id: int, community_id: int,
+                       category_id: int, external_ids=None):
+    """Import the seller's VK Market items into their shop (idempotent upsert)."""
+    return asyncio.run(_import_vk_products_async(self, shop_id, community_id,
+                                                 category_id, external_ids))
+
+
 async def _settle_promotions_async():
     from app.services import promotion_service
 
