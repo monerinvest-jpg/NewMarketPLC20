@@ -11,8 +11,10 @@ from sqlalchemy import select
 
 pytestmark = pytest.mark.asyncio
 
-BUYER = {"email": "buyer@smoke.test", "password": "smoke-pass-123", "full_name": "Смоук Покупатель"}
-SELLER = {"email": "seller@smoke.test", "password": "smoke-pass-123", "full_name": "Смоук Продавец", "role": "seller"}
+# NB: pydantic's EmailStr rejects reserved TLDs (.test/.example) — use a
+# plausible real-world domain (syntax check only, no DNS lookup).
+BUYER = {"email": "buyer@smoke-marketplace.ru", "password": "smoke-pass-123", "full_name": "Смоук Покупатель"}
+SELLER = {"email": "seller@smoke-marketplace.ru", "password": "smoke-pass-123", "full_name": "Смоук Продавец", "role": "seller"}
 
 
 async def _register_and_login(client, creds) -> dict:
