@@ -9,6 +9,7 @@ the payment gateway fails into a pending payment, the cache is disabled.
 """
 import os
 import sys
+import tempfile
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -17,7 +18,8 @@ os.environ.setdefault("CACHE_ENABLED", "false")
 os.environ.setdefault("METRICS_ENABLED", "false")
 os.environ.setdefault("REDIS_URL", "redis://127.0.0.1:63790/0")  # nonexistent
 os.environ.setdefault("SENTRY_DSN", "")
-os.environ.setdefault("UPLOAD_DIR", os.path.join(os.path.dirname(__file__), "_uploads"))
+# Writable scratch dir (the tests dir may be mounted read-only in containers).
+os.environ.setdefault("UPLOAD_DIR", os.path.join(tempfile.gettempdir(), "smoke_uploads"))
 
 import asyncio
 
