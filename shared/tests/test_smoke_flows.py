@@ -108,7 +108,7 @@ async def test_cart_flow(client):
     line = next(i for i in items if i["product_id"] == product_id)
     assert line["quantity"] == 2
 
-    r = await client.put(f"/api/v1/cart/{line['id']}", headers=headers, json={"quantity": 1})
+    r = await client.patch(f"/api/v1/cart/{line['id']}", headers=headers, json={"quantity": 1})
     assert r.status_code == 200, r.text
 
 
