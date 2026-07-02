@@ -251,7 +251,14 @@ async def create_product(
             link=f"/products/{product.id}",
         )
         await db.commit()
-    return product
+
+    # Re-select with images eagerly loaded: the response model serializes
+    # `images`, and a lazy load at serialization time raises MissingGreenlet
+    # under asyncio.
+    result = await db.execute(
+        select(Product).options(selectinload(Product.images)).where(Product.id == product.id)
+    )
+    return result.scalar_one()
 
 
 @router.put("/{product_id}", response_model=ProductOut)
@@ -273,8 +280,11 @@ async def update_product(
         setattr(product, field, value)
 
     await db.commit()
-    await db.refresh(product)
-    return product
+    # Eager images for serialization (see create_product).
+    result = await db.execute(
+        select(Product).options(selectinload(Product.images)).where(Product.id == product.id)
+    )
+    return result.scalar_one()
 
 
 @router.delete("/{product_id}", status_code=status.HTTP_204_NO_CONTENT)
