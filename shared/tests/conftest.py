@@ -25,8 +25,17 @@ import asyncio
 
 import pytest
 import pytest_asyncio
+from sqlalchemy import BigInteger
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.pool import StaticPool
+
+
+# SQLite autoincrements only INTEGER PRIMARY KEY — render the models' BIGINT
+# ids as INTEGER on the sqlite dialect so inserts get generated ids like on PG.
+@compiles(BigInteger, "sqlite")
+def _bigint_as_integer_on_sqlite(type_, compiler, **kw):
+    return "INTEGER"
 
 
 @pytest.fixture(scope="session")
