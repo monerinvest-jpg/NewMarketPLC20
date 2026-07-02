@@ -4,6 +4,7 @@ import {
   Form, Input, Button, Card, Typography, Divider, message,
   Steps, InputNumber, Spin, Alert, Radio, Select, Checkbox
 } from 'antd'
+import { SafetyCertificateOutlined } from '@ant-design/icons'
 import { useCartStore } from '@/store/cartStore'
 import { useAuthStore } from '@/store/authStore'
 import { ordersApi, deliveryApi } from '@/api'
@@ -343,6 +344,13 @@ export default function CheckoutPage() {
             <Button type="primary" htmlType="submit" size="large" block loading={submitting}>
               Перейти к оплате
             </Button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12, justifyContent: 'center' }}>
+              <SafetyCertificateOutlined style={{ color: '#4d7c0f' }} />
+              <Text type="secondary" style={{ fontSize: 12 }}>
+                Покупка защищена: продавец получит деньги после подтверждения получения.{' '}
+                <a href="/info/protection" target="_blank" rel="noreferrer">Подробнее</a>
+              </Text>
+            </div>
           </Form>
         </Card>
 

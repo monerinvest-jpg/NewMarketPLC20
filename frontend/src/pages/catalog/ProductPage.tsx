@@ -8,7 +8,7 @@ import {
 import {
   ShoppingCartOutlined, HeartOutlined, HeartFilled, LikeOutlined,
   LikeFilled, FlagOutlined, SwapOutlined, PlusOutlined, FolderAddOutlined,
-  CheckCircleFilled
+  CheckCircleFilled, SafetyCertificateOutlined
 } from '@ant-design/icons'
 import {
   productsApi, reviewsApi, favoritesApi, variantsApi,
@@ -379,6 +379,25 @@ export default function ProductPage() {
               title="Пожаловаться на товар"
             />
           </div>
+
+          {/* Buyer-protection badge: the escrow-style payout flow, surfaced */}
+          <Link to="/info/protection">
+            <div
+              style={{
+                display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16,
+                padding: '10px 14px', borderRadius: 10,
+                background: '#f0f7e8', border: '1px solid #cfe3b8', cursor: 'pointer',
+              }}
+            >
+              <SafetyCertificateOutlined style={{ fontSize: 22, color: '#4d7c0f' }} />
+              <div>
+                <Text strong style={{ color: '#3f6212', display: 'block' }}>Защита покупателя</Text>
+                <Text type="secondary" style={{ fontSize: 12 }}>
+                  Продавец получит деньги только после того, как вы подтвердите получение заказа
+                </Text>
+              </div>
+            </div>
+          </Link>
 
           <Button onClick={handleChat} style={{ marginBottom: 16 }}>Написать продавцу</Button>
           <Button

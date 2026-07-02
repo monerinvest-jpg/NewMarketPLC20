@@ -10,7 +10,7 @@ from decimal import Decimal
 from typing import List, Optional
 
 from sqlalchemy import (
-    BigInteger, Boolean, DateTime, Enum as _SAEnum, ForeignKey, Index,
+    BigInteger, Boolean, Date, DateTime, Enum as _SAEnum, ForeignKey, Index,
     Integer, Numeric, String, Text, UniqueConstraint, func,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship

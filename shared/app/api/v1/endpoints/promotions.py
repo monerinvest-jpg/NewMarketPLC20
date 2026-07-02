@@ -7,6 +7,8 @@ Paid promotion endpoints.
   view all promotions, trigger settlement.
 - public_router (/promotions): the homepage "promoted" row (auction winners).
 """
+from decimal import Decimal
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import select
@@ -103,6 +105,49 @@ async def promotions_analytics(
     attributed revenue and ROI per campaign, plus totals."""
     shop = await _shop_for(db, current_user)
     return await promotion_service.seller_analytics(db, shop.id)
+
+
+@seller_router.get("/analytics/daily")
+async def promotions_daily_stats(
+    days: int = 30,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_seller),
+):
+    """Per-day ad dynamics (impressions/clicks/CTR/spend) for the cabinet chart."""
+    shop = await _shop_for(db, current_user)
+    return await promotion_service.daily_stats(db, shop.id, days=min(days, 90))
+
+
+@seller_router.get("/demand-forecast")
+async def promotions_demand_forecast(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_seller),
+):
+    """Naive weekly demand forecast per top product (units, trend, next week)."""
+    shop = await _shop_for(db, current_user)
+    return await promotion_service.demand_forecast(db, shop.id)
+
+
+class _BidUpdate(BaseModel):
+    bid_amount: Decimal
+
+
+@seller_router.patch("/{promotion_id}/bid", response_model=PromotionOut)
+async def update_promotion_bid(
+    promotion_id: int,
+    payload: _BidUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_seller),
+):
+    """Change an auction bid; it competes at the next settlement pass."""
+    shop = await _shop_for(db, current_user)
+    try:
+        promo = await promotion_service.update_bid(db, shop.id, promotion_id, payload.bid_amount)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    await db.commit()
+    await db.refresh(promo)
+    return promo
 
 
 @seller_router.get("/features", response_model=list[PaidFeatureOut])

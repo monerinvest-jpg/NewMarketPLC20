@@ -443,6 +443,27 @@ class Promotion(Base):
     feature: Mapped["PaidFeature"] = relationship("PaidFeature")
 
 
+class PromotionStatDaily(Base):
+    """
+    Per-day ad counters for a promotion (impressions / clicks / spend), so the
+    seller cabinet can chart campaign dynamics instead of lifetime totals only.
+    Bumped by record_event (views/clicks) and by the auction settlement (spend).
+    """
+    __tablename__ = "promotion_stat_daily"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    promotion_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("promotion.id"), nullable=False, index=True)
+    shop_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("shop.id"), nullable=False, index=True)
+    day: Mapped[datetime] = mapped_column(Date, nullable=False)
+    impressions: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    clicks: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    spend: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=Decimal("0.00"), nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("promotion_id", "day", name="uq_promo_stat_promo_day"),
+    )
+
+
 class AdWalletTransaction(Base):
     """
     Ledger for a shop's advertising wallet (Shop.ad_balance). Top-ups credit the

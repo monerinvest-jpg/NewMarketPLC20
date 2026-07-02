@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react'
 import {
   Card, Row, Col, Typography, Button, Table, Tag, Select, InputNumber, Form,
-  message, Statistic, Space, Alert, Empty,
+  message, Statistic, Space, Alert, Empty, Modal,
 } from 'antd'
-import { RiseOutlined } from '@ant-design/icons'
+import { RiseOutlined, EditOutlined, ArrowUpOutlined, ArrowDownOutlined } from '@ant-design/icons'
+import {
+  LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
+} from 'recharts'
 import { promotionsApi, productsApi } from '@/api'
 import type { PaidFeature, Promotion, AuctionStanding, Product, PromotionStatus, AdWallet } from '@/types'
 import dayjs from 'dayjs'
@@ -27,6 +30,9 @@ export default function SellerPromotion() {
   const [selectedFeature, setSelectedFeature] = useState<PaidFeature | null>(null)
   const [wallet, setWallet] = useState<AdWallet | null>(null)
   const [analytics, setAnalytics] = useState<any | null>(null)
+  const [daily, setDaily] = useState<{ day: string; impressions: number; clicks: number; ctr: number; spend: string }[]>([])
+  const [forecast, setForecast] = useState<{ product_id: number; title: string; sold_total: number; trend_pct: number; forecast_next_week: number }[]>([])
+  const [bidEdit, setBidEdit] = useState<{ promo: Promotion; value: number } | null>(null)
 
   const loadWallet = () => promotionsApi.wallet().then(setWallet).catch(() => {})
 
@@ -39,9 +45,23 @@ export default function SellerPromotion() {
     promotionsApi.mine().then(setPromotions).catch(() => {})
     productsApi.myProducts({ page_size: 100 }).then((r) => setProducts(r.items)).catch(() => {})
     promotionsApi.analytics().then(setAnalytics).catch(() => {})
+    promotionsApi.dailyStats(30).then(setDaily).catch(() => {})
+    promotionsApi.demandForecast().then(setForecast).catch(() => {})
     loadWallet()
   }
   useEffect(() => { load() }, [])
+
+  const saveBid = async () => {
+    if (!bidEdit) return
+    try {
+      await promotionsApi.updateBid(bidEdit.promo.id, bidEdit.value)
+      message.success('Ставка обновлена — вступит в силу при следующем расчёте аукциона')
+      setBidEdit(null)
+      load()
+    } catch (e: any) {
+      message.error(e?.response?.data?.detail || 'Не удалось изменить ставку')
+    }
+  }
 
   const topup = async (packageId: string) => {
     try {
@@ -181,6 +201,38 @@ export default function SellerPromotion() {
           <Col xs={8} md={4}><Card size="small"><Statistic title="ROI" value={analytics.totals.roi ?? '—'} suffix={analytics.totals.roi != null ? '%' : ''} valueStyle={{ color: (analytics.totals.roi ?? 0) >= 0 ? '#3f8600' : '#cf1322' }} /></Card></Col>
         </Row>
       )}
+      {daily.length > 0 && (
+        <Row gutter={16} style={{ marginBottom: 16 }}>
+          <Col xs={24} md={14}>
+            <Card size="small" title="Показы и клики по дням (30 дн.)">
+              <ResponsiveContainer width="100%" height={220}>
+                <LineChart data={daily.map((d) => ({ ...d, day: dayjs(d.day).format('DD.MM') }))}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="day" fontSize={11} />
+                  <YAxis fontSize={11} allowDecimals={false} />
+                  <Tooltip />
+                  <Legend />
+                  <Line type="monotone" dataKey="impressions" name="Показы" stroke="#b45309" dot={false} />
+                  <Line type="monotone" dataKey="clicks" name="Клики" stroke="#4d7c0f" dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            </Card>
+          </Col>
+          <Col xs={24} md={10}>
+            <Card size="small" title="Расход по дням, ₽">
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={daily.map((d) => ({ day: dayjs(d.day).format('DD.MM'), spend: Number(d.spend) }))}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="day" fontSize={11} />
+                  <YAxis fontSize={11} />
+                  <Tooltip />
+                  <Bar dataKey="spend" name="Расход" fill="#d97706" />
+                </BarChart>
+              </ResponsiveContainer>
+            </Card>
+          </Col>
+        </Row>
+      )}
       <Table
         dataSource={analytics?.rows || []} rowKey="promotion_id" pagination={{ pageSize: 8 }} size="small"
         style={{ marginBottom: 32 }}
@@ -210,13 +262,68 @@ export default function SellerPromotion() {
           { title: 'Статус', dataIndex: 'status', width: 140, render: (v: PromotionStatus) => <Tag color={statusMeta[v]?.color}>{statusMeta[v]?.label}</Tag> },
           { title: 'Создано', dataIndex: 'created_at', width: 120, render: (v) => dayjs(v).format('DD.MM.YY') },
           {
-            title: '', width: 110, render: (_, r) => (
-              ['pending', 'active', 'outbid'].includes(r.status)
-                ? <Button size="small" danger onClick={() => cancel(r.id)}>Отменить</Button> : null
+            title: '', width: 190, render: (_, r) => (
+              ['pending', 'active', 'outbid'].includes(r.status) ? (
+                <Space size={4}>
+                  <Button
+                    size="small" icon={<EditOutlined />}
+                    onClick={() => setBidEdit({ promo: r, value: Number(r.bid_amount) })}
+                  >
+                    Ставка
+                  </Button>
+                  <Button size="small" danger onClick={() => cancel(r.id)}>Отменить</Button>
+                </Space>
+              ) : null
             ),
           },
         ]}
       />
+
+      {/* Прогноз спроса — чтобы понимать, что двигать рекламой и что держать на складе */}
+      <Title level={4} style={{ marginTop: 32 }}>Прогноз спроса (8 недель продаж)</Title>
+      <Paragraph type="secondary">
+        Простой прогноз по фактическим продажам: тренд сравнивает последние недели с
+        предыдущими, прогноз — ожидаемые продажи на следующую неделю. Помогает выбрать,
+        какие товары продвигать и сколько держать на складе.
+      </Paragraph>
+      <Table
+        dataSource={forecast} rowKey="product_id" pagination={false} size="small"
+        locale={{ emptyText: 'Пока нет продаж для прогноза' }}
+        columns={[
+          { title: 'Товар', dataIndex: 'title', ellipsis: true },
+          { title: 'Продано (8 нед.)', dataIndex: 'sold_total', width: 140 },
+          {
+            title: 'Тренд', dataIndex: 'trend_pct', width: 120,
+            render: (v: number) => (
+              <Text type={v > 0 ? 'success' : v < 0 ? 'danger' : 'secondary'}>
+                {v > 0 ? <ArrowUpOutlined /> : v < 0 ? <ArrowDownOutlined /> : null} {v}%
+              </Text>
+            ),
+          },
+          { title: 'Прогноз на след. неделю', dataIndex: 'forecast_next_week', width: 190, render: (v) => <Text strong>{v} шт.</Text> },
+        ]}
+      />
+
+      {/* Изменение ставки */}
+      <Modal
+        open={!!bidEdit}
+        title={`Ставка для кампании №${bidEdit?.promo.id}`}
+        onOk={saveBid}
+        onCancel={() => setBidEdit(null)}
+        okText="Сохранить"
+        cancelText="Отмена"
+      >
+        <Paragraph type="secondary">
+          Новая ставка участвует в следующем расчёте аукциона (раз в сутки).
+        </Paragraph>
+        <InputNumber
+          style={{ width: '100%' }}
+          min={1}
+          value={bidEdit?.value}
+          onChange={(v) => bidEdit && setBidEdit({ ...bidEdit, value: Number(v) })}
+          addonAfter="₽/день"
+        />
+      </Modal>
     </div>
   )
 }

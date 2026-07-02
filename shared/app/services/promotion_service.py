@@ -22,7 +22,7 @@ from sqlalchemy.orm import selectinload
 from app.models.models import (
     AdWalletTransaction, BalanceTransaction, BalanceTransactionType, NotificationType,
     Order, OrderItem, OrderStatus, PaidFeature, PaidFeaturePricing, Product, ProductStatus,
-    Promotion, PromotionStatus, Shop, Transaction, TransactionType, User,
+    Promotion, PromotionStatDaily, PromotionStatus, Shop, Transaction, TransactionType, User,
 )
 
 # Orders that count as real revenue for ad attribution.
@@ -209,6 +209,7 @@ async def settle_auction(db: AsyncSession, feature: PaidFeature) -> dict:
                 promo.last_charged_at = _now()
                 promo.total_spent = (promo.total_spent or Decimal("0.00")) + promo.bid_amount
                 charged += promo.bid_amount
+                await _bump_daily(db, promo, spend=promo.bid_amount)
             promo.status = PromotionStatus.active
             if promo.starts_at is None:
                 promo.starts_at = _now()
@@ -288,6 +289,26 @@ async def active_homepage_promotions(db: AsyncSession, limit: int = 5) -> list[t
     return [(promo, by_id[promo.product_id]) for promo in rows if promo.product_id in by_id]
 
 
+async def _bump_daily(
+    db: AsyncSession, promo: Promotion, *,
+    impressions: int = 0, clicks: int = 0, spend: Decimal = Decimal("0.00"),
+) -> None:
+    """Upsert today's per-day stat row for the promotion (chartable dynamics)."""
+    today = _now().date()
+    row = (await db.execute(
+        select(PromotionStatDaily).where(
+            PromotionStatDaily.promotion_id == promo.id,
+            PromotionStatDaily.day == today,
+        )
+    )).scalar_one_or_none()
+    if row is None:
+        row = PromotionStatDaily(promotion_id=promo.id, shop_id=promo.shop_id, day=today)
+        db.add(row)
+    row.impressions = (row.impressions or 0) + impressions
+    row.clicks = (row.clicks or 0) + clicks
+    row.spend = (row.spend or Decimal("0.00")) + spend
+
+
 async def record_event(db: AsyncSession, promotion_id: int, kind: str) -> bool:
     """Increment a promotion's impression/click counter (analytics)."""
     promo = (await db.execute(
@@ -297,8 +318,10 @@ async def record_event(db: AsyncSession, promotion_id: int, kind: str) -> bool:
         return False
     if kind == "impression":
         promo.impressions = (promo.impressions or 0) + 1
+        await _bump_daily(db, promo, impressions=1)
     elif kind == "click":
         promo.clicks = (promo.clicks or 0) + 1
+        await _bump_daily(db, promo, clicks=1)
     else:
         return False
     return True
@@ -411,3 +434,103 @@ async def wallet_overview(db: AsyncSession, shop: Shop, limit: int = 20) -> dict
             for t in rows
         ],
     }
+
+
+async def daily_stats(db: AsyncSession, shop_id: int, days: int = 30) -> list[dict]:
+    """Shop-wide per-day ad dynamics (impressions/clicks/spend) for charts."""
+    since = (_now() - timedelta(days=days)).date()
+    rows = (await db.execute(
+        select(
+            PromotionStatDaily.day,
+            func.sum(PromotionStatDaily.impressions),
+            func.sum(PromotionStatDaily.clicks),
+            func.sum(PromotionStatDaily.spend),
+        )
+        .where(PromotionStatDaily.shop_id == shop_id, PromotionStatDaily.day >= since)
+        .group_by(PromotionStatDaily.day)
+        .order_by(PromotionStatDaily.day)
+    )).all()
+    return [
+        {
+            "day": day.isoformat(),
+            "impressions": int(imp or 0),
+            "clicks": int(clk or 0),
+            "ctr": round((clk or 0) / imp * 100, 2) if imp else 0,
+            "spend": str(spend or Decimal("0.00")),
+        }
+        for day, imp, clk, spend in rows
+    ]
+
+
+async def update_bid(db: AsyncSession, shop_id: int, promotion_id: int, bid_amount: Decimal) -> Promotion:
+    """Change the daily bid of a live auction promotion. The new bid takes part
+    in the NEXT settlement pass (nightly), like on real ad platforms."""
+    promo = (await db.execute(
+        select(Promotion).where(Promotion.id == promotion_id, Promotion.shop_id == shop_id)
+    )).scalar_one_or_none()
+    if promo is None:
+        raise ValueError("Кампания не найдена")
+    if promo.status not in (PromotionStatus.pending, PromotionStatus.active, PromotionStatus.outbid):
+        raise ValueError("Ставку можно менять только у активной или перебитой кампании")
+    feature = (await db.execute(
+        select(PaidFeature).where(PaidFeature.id == promo.feature_id)
+    )).scalar_one()
+    if feature.pricing_mode != PaidFeaturePricing.auction:
+        raise ValueError("Ставка меняется только у аукционных размещений")
+    if bid_amount < feature.price:
+        raise ValueError(f"Минимальная ставка (резерв) — {feature.price} ₽")
+    promo.bid_amount = bid_amount
+    return promo
+
+
+async def demand_forecast(db: AsyncSession, shop_id: int, weeks: int = 8) -> list[dict]:
+    """
+    Naive per-product demand forecast for the seller: weekly units sold over the
+    last `weeks` weeks, the trend of the recent half vs the earlier half, and a
+    next-week projection (average of the last 2 weeks adjusted by the trend).
+    Top products by units; enough to steer stock and ad bids without ML.
+    """
+    since = _now() - timedelta(weeks=weeks)
+    week_expr = func.date_trunc("week", Order.created_at)
+    rows = (await db.execute(
+        select(
+            OrderItem.product_id,
+            Product.title,
+            week_expr.label("week"),
+            func.sum(OrderItem.quantity),
+        )
+        .join(Order, Order.id == OrderItem.order_id)
+        .join(Product, Product.id == OrderItem.product_id)
+        .where(
+            Product.shop_id == shop_id,
+            Order.created_at >= since,
+            Order.status.in_(_REVENUE_STATUSES),
+        )
+        .group_by(OrderItem.product_id, Product.title, week_expr)
+    )).all()
+
+    by_product: dict[int, dict] = {}
+    for product_id, title, week, qty in rows:
+        entry = by_product.setdefault(product_id, {"title": title, "weeks": {}})
+        entry["weeks"][week.date().isoformat()] = int(qty or 0)
+
+    out = []
+    for product_id, data in by_product.items():
+        series = [data["weeks"].get(d, 0) for d in sorted(data["weeks"])]
+        # Pad implicit zero-weeks by comparing halves of the observed span only.
+        half = max(1, len(series) // 2)
+        early = sum(series[:half]) / half
+        late = sum(series[half:]) / max(1, len(series) - half)
+        trend = round((late - early) / early * 100) if early else (100 if late else 0)
+        recent_avg = sum(series[-2:]) / min(2, len(series)) if series else 0
+        forecast = max(0, round(recent_avg * (1 + trend / 200)))  # dampened trend
+        out.append({
+            "product_id": product_id,
+            "title": data["title"],
+            "sold_total": sum(series),
+            "weekly": series,
+            "trend_pct": trend,
+            "forecast_next_week": forecast,
+        })
+    out.sort(key=lambda x: x["sold_total"], reverse=True)
+    return out[:10]

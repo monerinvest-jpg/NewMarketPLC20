@@ -293,6 +293,7 @@ export default function MainLayout() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 <Link to="/info/faq" style={{ color: '#8c7a66' }}>Вопросы и ответы</Link>
                 <Link to="/info/delivery" style={{ color: '#8c7a66' }}>Доставка и оплата</Link>
+                <Link to="/info/protection" style={{ color: '#8c7a66' }}>Защита покупателя</Link>
                 <Link to="/returns" style={{ color: '#8c7a66' }}>Возвраты</Link>
                 <Link to="/support" style={{ color: '#8c7a66' }}>Поддержка</Link>
               </div>

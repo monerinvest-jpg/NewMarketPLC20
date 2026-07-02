@@ -825,6 +825,14 @@ export const promotionsApi = {
   wallet: () => api.get<AdWallet>('/seller/promotions/wallet').then(r => r.data),
   topup: (package_id: string) =>
     api.post<{ ad_balance: string; credited: string }>('/seller/promotions/wallet/topup', { package_id }).then(r => r.data),
+  dailyStats: (days = 30) =>
+    api.get<{ day: string; impressions: number; clicks: number; ctr: number; spend: string }[]>(
+      '/seller/promotions/analytics/daily', { params: { days } }).then(r => r.data),
+  demandForecast: () =>
+    api.get<{ product_id: number; title: string; sold_total: number; weekly: number[]; trend_pct: number; forecast_next_week: number }[]>(
+      '/seller/promotions/demand-forecast').then(r => r.data),
+  updateBid: (id: number, bid_amount: number) =>
+    api.patch<Promotion>(`/seller/promotions/${id}/bid`, { bid_amount }).then(r => r.data),
   // public
   homepage: () => api.get<{ promotion_id: number; product: Product }[]>('/promotions/homepage').then(r => r.data),
   recordEvent: (promotionId: number, type: 'impression' | 'click') =>
