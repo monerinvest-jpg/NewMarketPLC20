@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Row, Col, Typography, Button, Tag } from 'antd'
+import { Row, Col, Typography, Button } from 'antd'
 import { ArrowRightOutlined } from '@ant-design/icons'
 import { productsApi, categoriesApi, homeApi } from '@/api'
 import type { Product, Category } from '@/types'
@@ -141,24 +141,39 @@ export default function HomePage() {
         </>
       )}
 
-      {/* Categories */}
+      {/* Categories — cards with an image (or a kind-emoji placeholder) */}
       <Title level={3}>Категории</Title>
       <Row gutter={[12, 12]} style={{ marginBottom: 40 }}>
-        {categories.map((cat) => (
-          <Col key={cat.id}>
-            <Link to={`/catalog?category_id=${cat.id}`}>
-              <Tag
-                style={{
-                  padding: '8px 16px', fontSize: 14, cursor: 'pointer',
-                  border: '1px solid #b45309', color: '#b45309', background: '#fff7ed',
-                  borderRadius: 20,
-                }}
-              >
-                {cat.name}
-              </Tag>
-            </Link>
-          </Col>
-        ))}
+        {categories.map((cat) => {
+          const emoji = cat.kind === 'digital' ? '💾' : cat.kind === 'course' ? '🎓' : '🪵'
+          return (
+            <Col key={cat.id} xs={12} sm={8} md={6} lg={4}>
+              <Link to={`/catalog?category_id=${cat.id}`}>
+                <div
+                  className="product-card"
+                  style={{
+                    borderRadius: 14, overflow: 'hidden', background: '#fffdf9',
+                    border: '1px solid #efe3d2', textAlign: 'center', cursor: 'pointer',
+                  }}
+                >
+                  <div style={{ height: 96, overflow: 'hidden', background: '#f3e9db', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {cat.image ? (
+                      <img src={cat.image} alt={cat.name} loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ) : (
+                      <span style={{ fontSize: 40 }}>{emoji}</span>
+                    )}
+                  </div>
+                  <div style={{ padding: '10px 8px' }}>
+                    <Text strong style={{ color: '#5b3a1e' }}>{cat.name}</Text>
+                    {cat.children?.length > 0 && (
+                      <div><Text type="secondary" style={{ fontSize: 12 }}>{cat.children.length} подкатегорий</Text></div>
+                    )}
+                  </div>
+                </div>
+              </Link>
+            </Col>
+          )
+        })}
       </Row>
 
       {/* Popular products */}

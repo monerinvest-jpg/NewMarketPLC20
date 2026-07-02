@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import {
   Row, Col, Image, Button, Rate, Typography, Tabs, InputNumber,
-  Spin, message, Form, Input, List, Avatar, Empty, Card, Radio, Modal, Tag, Checkbox, Upload
+  Spin, message, Form, Input, List, Avatar, Empty, Card, Radio, Modal, Tag, Checkbox, Upload,
+  Breadcrumb,
 } from 'antd'
 import {
   ShoppingCartOutlined, HeartOutlined, HeartFilled, LikeOutlined,
@@ -11,9 +12,10 @@ import {
 } from '@ant-design/icons'
 import {
   productsApi, reviewsApi, favoritesApi, variantsApi,
-  questionsApi, recommendationsApi, chatApi, productSubsApi, promoRulesApi
+  questionsApi, recommendationsApi, chatApi, productSubsApi, promoRulesApi,
+  categoriesApi,
 } from '@/api'
-import type { Product, Review, ProductVariant, ProductQuestion } from '@/types'
+import type { Product, Review, ProductVariant, ProductQuestion, Category } from '@/types'
 import { useCartStore } from '@/store/cartStore'
 import { useAuthStore } from '@/store/authStore'
 import { useCompareStore } from '@/store/compareStore'
@@ -30,6 +32,7 @@ export default function ProductPage() {
   const compare = useCompareStore()
 
   const [product, setProduct] = useState<Product | null>(null)
+  const [categories, setCategories] = useState<Category[]>([])
   const [reviews, setReviews] = useState<Review[]>([])
   const [bundles, setBundles] = useState<any[]>([])
   const [verifiedOnly, setVerifiedOnly] = useState(false)
@@ -92,6 +95,18 @@ export default function ProductPage() {
   }
 
   useEffect(() => { load() }, [id])
+  useEffect(() => { categoriesApi.list().then(setCategories).catch(() => {}) }, [])
+
+  // Breadcrumb path: root category (and its child) that owns this product.
+  const categoryPath = (() => {
+    if (!product) return []
+    for (const root of categories) {
+      if (root.id === product.category_id) return [root]
+      const child = root.children?.find((c) => c.id === product.category_id)
+      if (child) return [root, child]
+    }
+    return []
+  })()
 
   const currentPrice = (() => {
     if (!product) return 0
@@ -232,6 +247,17 @@ export default function ProductPage() {
         description={product.description}
         image={(product.images.find((i) => i.is_main) || product.images[0])?.url}
         type="product"
+      />
+      <Breadcrumb
+        style={{ marginBottom: 16 }}
+        items={[
+          { title: <Link to="/">Главная</Link> },
+          { title: <Link to="/catalog">Каталог</Link> },
+          ...categoryPath.map((c) => ({
+            title: <Link to={`/catalog?category_id=${c.id}`}>{c.name}</Link>,
+          })),
+          { title: product.title },
+        ]}
       />
       <Row gutter={32}>
         <Col xs={24} md={10}>

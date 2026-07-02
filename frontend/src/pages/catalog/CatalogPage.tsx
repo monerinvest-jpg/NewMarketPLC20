@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
   Row, Col, Card, Slider, Select, Input, Pagination,
-  Typography, Button, Empty, Drawer, Grid, Badge
+  Typography, Button, Empty, Drawer, Grid, Badge, Tree
 } from 'antd'
 import { FilterOutlined } from '@ant-design/icons'
 import { productsApi, categoriesApi, facetsApi } from '@/api'
@@ -80,14 +80,30 @@ export default function CatalogPage() {
   const filtersContent = (
     <>
           <div style={{ marginBottom: 16 }}>
-            <Text strong>Категория</Text>
-            <Select
-              style={{ width: '100%', marginTop: 8 }}
-              value={categoryId || undefined}
-              placeholder="Все категории"
-              allowClear
-              onChange={(v) => setParam('category_id', v || '')}
-              options={categories.map((c) => ({ value: String(c.id), label: c.name }))}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+              <Text strong>Категория</Text>
+              {categoryId && (
+                <Button type="link" size="small" style={{ padding: 0 }} onClick={() => setParam('category_id', '')}>
+                  сбросить
+                </Button>
+              )}
+            </div>
+            <Tree
+              style={{ marginTop: 8, background: 'transparent' }}
+              blockNode
+              selectedKeys={categoryId ? [categoryId] : []}
+              defaultExpandedKeys={
+                // Expand the root that owns the selected child.
+                categoryId
+                  ? categories.filter((c) => c.children?.some((ch) => String(ch.id) === categoryId)).map((c) => String(c.id))
+                  : []
+              }
+              onSelect={(keys) => setParam('category_id', (keys[0] as string) || '')}
+              treeData={categories.map((c) => ({
+                title: c.name,
+                key: String(c.id),
+                children: (c.children || []).map((ch) => ({ title: ch.name, key: String(ch.id) })),
+              }))}
             />
           </div>
           <div style={{ marginBottom: 16 }}>
@@ -139,7 +155,8 @@ export default function CatalogPage() {
   )
 
   const categoryName = categoryId
-    ? categories.find((c) => String(c.id) === categoryId)?.name
+    ? categories.flatMap((c) => [c, ...(c.children || [])])
+        .find((c) => String(c.id) === categoryId)?.name
     : undefined
 
   return (
