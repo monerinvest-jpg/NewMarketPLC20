@@ -33,4 +33,8 @@ limiter = Limiter(
     key_func=client_ip,
     default_limits=[],
     storage_uri=settings.REDIS_URL,
+    # Without this flag slowapi RAISES (=500 on login!) whenever Redis is
+    # unreachable. With it, counting degrades to per-process memory until
+    # Redis returns — weaker limiting beats a broken auth path.
+    in_memory_fallback_enabled=True,
 )
