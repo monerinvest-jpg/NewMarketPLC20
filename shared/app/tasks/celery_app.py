@@ -1,16 +1,56 @@
 """
 Celery application and background task definitions.
 """
-from celery import Celery
+import json
+from datetime import datetime, timezone as dt_timezone
+
+from celery import Celery, Task
 from celery.schedules import crontab
 
 from app.core.config import settings
+
+DLQ_KEY = "celery:dlq"
+DLQ_MAX = 1000
+
+
+class ReliableTask(Task):
+    """
+    Base class for every task: transient failures (SMTP down, payment gateway
+    timeout, S3 hiccup) retry automatically with exponential backoff instead of
+    silently losing the job. Tasks that exhaust all retries land in a Redis
+    dead-letter list (celery:dlq) for manual inspection/replay.
+    """
+    autoretry_for = (Exception,)
+    retry_backoff = True          # 1s, 2s, 4s, ... between attempts
+    retry_backoff_max = 600       # cap the delay at 10 minutes
+    retry_jitter = True
+    retry_kwargs = {"max_retries": 5}
+
+    def on_failure(self, exc, task_id, args, kwargs, einfo):
+        # Called only when retries are exhausted (or the error isn't retryable).
+        try:
+            import redis  # ships with the celery[redis] stack
+            r = redis.Redis.from_url(settings.REDIS_URL)
+            r.lpush(DLQ_KEY, json.dumps({
+                "task": self.name,
+                "task_id": task_id,
+                "args": repr(args),
+                "kwargs": repr(kwargs),
+                "error": repr(exc),
+                "failed_at": datetime.now(dt_timezone.utc).isoformat(),
+            }, ensure_ascii=False))
+            r.ltrim(DLQ_KEY, 0, DLQ_MAX - 1)
+        except Exception:
+            pass  # the DLQ must never mask the original failure
+        super().on_failure(exc, task_id, args, kwargs, einfo)
+
 
 celery_app = Celery(
     "marketplace",
     broker=settings.CELERY_BROKER_URL,
     backend=settings.CELERY_RESULT_BACKEND,
     include=["app.tasks.tasks"],
+    task_cls=ReliableTask,
 )
 
 celery_app.conf.update(

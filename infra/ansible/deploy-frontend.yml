@@ -42,15 +42,39 @@
   become: true
   vars:
     kong_admin: "http://localhost:8001"
-    frontend_host: "{{ hostvars[groups['backend'][0]].ansible_host | default(groups['backend'][0]) }}"
   tasks:
-    - name: Upsert the Kong 'frontend' service
+    # HA: the SPA runs on every backend node — balance across all of them
+    # instead of pinning the catch-all to backend[0].
+    - name: Upsert the 'frontend' upstream (all backend nodes)
+      uri:
+        url: "{{ kong_admin }}/upstreams/frontend-upstream"
+        method: PUT
+        body_format: json
+        body:
+          healthchecks:
+            active:
+              http_path: /
+              type: http
+              healthy: { interval: 10, successes: 2 }
+              unhealthy: { interval: 10, http_failures: 3, tcp_failures: 3, timeouts: 3 }
+        status_code: [200, 201]
+
+    - name: Register every backend node as a frontend target
+      loop: "{{ groups['backend'] }}"
+      uri:
+        url: "{{ kong_admin }}/upstreams/frontend-upstream/targets"
+        method: POST
+        body_format: form-urlencoded
+        body: "target={{ hostvars[item].ansible_host | default(item) }}:3000&weight=100"
+        status_code: [200, 201, 409]
+
+    - name: Upsert the Kong 'frontend' service (points at the upstream)
       uri:
         url: "{{ kong_admin }}/services/frontend"
         method: PUT
         body_format: form-urlencoded
         body:
-          url: "http://{{ frontend_host }}:3000"
+          url: "http://frontend-upstream:3000"
         status_code: [200, 201]
 
     - name: Catch-all route '/' to the frontend (API prefixes are longer → they win)

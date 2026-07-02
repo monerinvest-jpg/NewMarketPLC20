@@ -52,31 +52,93 @@ resource "yandex_vpc_route_table" "nat" {
   }
 }
 
+# Внутренние подсети VPC: бастион (public), приватные A и B. Используются,
+# чтобы служебные порты были доступны только изнутри, а не с 0.0.0.0/0.
+locals {
+  internal_cidrs = [var.public_cidr, var.private_cidr, "192.168.20.0/24"]
+}
+
 # Группа безопасности для шлюза Kong
 resource "yandex_vpc_security_group" "kong" {
   name        = "${var.project_name}-kong-sg"
   network_id  = yandex_vpc_network.main.id
   description = "Kong API Gateway security group"
 
+  # Публичная точка входа: NLB — passthrough (L4), пакеты приходят с реальных
+  # IP клиентов, поэтому 8000 должен быть открыт миру.
   ingress {
-    description    = "HTTP from load balancer"
+    description    = "HTTP from load balancer (public edge)"
     protocol       = "TCP"
     port           = 8000
     v4_cidr_blocks = ["0.0.0.0/0"]
   }
 
   ingress {
-    description    = "Admin API (for Ansible)"
+    description    = "Kong Admin API — in-VPC only (Ansible via bastion, Prometheus)"
     protocol       = "TCP"
     port           = 8001
+    v4_cidr_blocks = local.internal_cidrs
+  }
+
+  ingress {
+    description    = "SSH from the bastion subnet only"
+    protocol       = "TCP"
+    port           = 22
+    v4_cidr_blocks = [var.public_cidr]
+  }
+
+  ingress {
+    description    = "node-exporter scrape from Prometheus (bastion)"
+    protocol       = "TCP"
+    port           = 9100
+    v4_cidr_blocks = [var.public_cidr]
+  }
+
+  egress {
+    description    = "Allow all outgoing"
+    protocol       = "ANY"
+    v4_cidr_blocks = ["0.0.0.0/0"]
+    from_port      = 0
+    to_port        = 65535
+  }
+}
+
+# Группа безопасности бастиона (раньше SG не было вовсе — всё, что на нём
+# слушало, было доступно из интернета, включая Prometheus :9090).
+resource "yandex_vpc_security_group" "bastion" {
+  name        = "${var.project_name}-bastion-sg"
+  network_id  = yandex_vpc_network.main.id
+  description = "Bastion + observability host"
+
+  ingress {
+    description    = "SSH (jump host)"
+    protocol       = "TCP"
+    port           = 22
+    v4_cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  # Grafana остаётся публичной СОЗНАТЕЛЬНО: на ней держится iframe в админке
+  # («Метрики»). Анонимный доступ — только Viewer. Закрыть за VPN/авторизацией
+  # при боевом запуске (см. prod-план).
+  ingress {
+    description    = "Grafana (admin Метрики iframe)"
+    protocol       = "TCP"
+    port           = 3000
     v4_cidr_blocks = ["0.0.0.0/0"]
   }
 
   ingress {
-    description    = "SSH from Bastion"
+    description    = "Prometheus — in-VPC only"
     protocol       = "TCP"
-    port           = 22
-    v4_cidr_blocks = ["0.0.0.0/0"]
+    port           = 9090
+    v4_cidr_blocks = local.internal_cidrs
+  }
+
+  ingress {
+    description    = "Loki push (Alloy agents) — in-VPC only"
+    protocol       = "TCP"
+    port           = 3100
+    v4_cidr_blocks = local.internal_cidrs
   }
 
   egress {
@@ -99,25 +161,25 @@ resource "yandex_vpc_security_group" "backend" {
   # эти порты. В исходном монолите здесь был только порт 3000 — он больше не
   # используется (см. infra/ansible/deploy-services.yml, маппинг портов).
   ingress {
-    description    = "Service ports from Kong (identity/catalog/orders/sellers/platform)"
+    description    = "Service ports — Kong subnets + Prometheus (in-VPC only)"
     protocol       = "TCP"
     from_port      = 8001
     to_port        = 8005
-    v4_cidr_blocks = ["0.0.0.0/0"]
+    v4_cidr_blocks = local.internal_cidrs
   }
 
   ingress {
-    description    = "Frontend SPA port from Kong"
+    description    = "Frontend SPA port from Kong (in-VPC only)"
     protocol       = "TCP"
     port           = 3000
-    v4_cidr_blocks = ["0.0.0.0/0"]
+    v4_cidr_blocks = local.internal_cidrs
   }
 
   ingress {
-    description    = "SSH from Bastion"
+    description    = "SSH from the bastion subnet only"
     protocol       = "TCP"
     port           = 22
-    v4_cidr_blocks = ["0.0.0.0/0"]
+    v4_cidr_blocks = [var.public_cidr]
   }
 
   # MeiliSearch on the first backend node; reachable from the private subnets
@@ -127,6 +189,13 @@ resource "yandex_vpc_security_group" "backend" {
     protocol       = "TCP"
     port           = 7700
     v4_cidr_blocks = [var.private_cidr, "192.168.20.0/24"]
+  }
+
+  ingress {
+    description    = "node-exporter scrape from Prometheus (bastion)"
+    protocol       = "TCP"
+    port           = 9100
+    v4_cidr_blocks = [var.public_cidr]
   }
 
   egress {

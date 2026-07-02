@@ -168,14 +168,44 @@
         -v /opt/handmade/certs:/app/certs:ro
         {{ registry }}/handmade-worker:{{ image_tag }} beat
 
+    # --- Offsite PG dump: nightly pg_dump -> private S3 bucket (survives cluster loss) ---
+    - name: Install pg-backup env (credentials for the dump script)
+      run_once: true
+      copy:
+        dest: /opt/handmade/pg-backup.env
+        mode: "0600"
+        content: |
+          DB_HOST={{ postgres_host }}
+          DB_PORT=6432
+          DB_USER={{ postgres_user }}
+          DB_PASSWORD={{ postgres_password }}
+          DB_NAME={{ postgres_database }}
+          S3_ENDPOINT={{ s3_endpoint }}
+          S3_PRIVATE_BUCKET={{ s3_private_bucket }}
+          S3_ACCESS_KEY={{ s3_access_key }}
+          S3_SECRET_KEY={{ s3_secret_key }}
+
+    - name: Install pg-backup script
+      run_once: true
+      copy:
+        src: files/pg-backup.sh
+        dest: /opt/handmade/pg-backup.sh
+        mode: "0755"
+
+    - name: Nightly offsite PG dump (02:30, after the managed backup window)
+      run_once: true
+      cron:
+        name: pg-offsite-backup
+        minute: "30"
+        hour: "2"
+        job: "/opt/handmade/pg-backup.sh >> /var/log/pg-backup.log 2>&1"
+
 - name: Configure Kong routes (one route per path prefix)
   hosts: kong
   run_once: true
   become: true
   vars:
     kong_admin: "http://localhost:8001"
-    # Kong reaches the services on the first backend node (multiplexed ports).
-    backend_host: "{{ hostvars[groups['backend'][0]].ansible_host | default(groups['backend'][0]) }}"
     # service -> [port, [path prefixes]]
     routes:
       identity:
@@ -208,7 +238,39 @@
         priority: 0
 
   tasks:
-    - name: Upsert a Kong service per microservice
+    # HA: every service gets a Kong UPSTREAM whose targets are ALL backend nodes
+    # (previously the service URL pointed only at backend[0] — the second node
+    # got no traffic and its loss/overload wasn't survivable). Active health
+    # checks pull a dead node out of rotation via each service's /health.
+    - name: Upsert a Kong upstream per microservice (all backend nodes)
+      loop: "{{ routes | dict2items }}"
+      loop_control:
+        label: "{{ item.key }}"
+      uri:
+        url: "{{ kong_admin }}/upstreams/{{ item.key }}-upstream"
+        method: PUT
+        body_format: json
+        body:
+          healthchecks:
+            active:
+              http_path: /health
+              type: http
+              healthy: { interval: 10, successes: 2 }
+              unhealthy: { interval: 10, http_failures: 3, tcp_failures: 3, timeouts: 3 }
+        status_code: [200, 201]
+
+    - name: Register every backend node as an upstream target
+      loop: "{{ routes | dict2items | product(groups['backend']) | list }}"
+      loop_control:
+        label: "{{ item.0.key }} -> {{ item.1 }}"
+      uri:
+        url: "{{ kong_admin }}/upstreams/{{ item.0.key }}-upstream/targets"
+        method: POST
+        body_format: form-urlencoded
+        body: "target={{ hostvars[item.1].ansible_host | default(item.1) }}:{{ item.0.value.port }}&weight=100"
+        status_code: [200, 201, 409]
+
+    - name: Upsert a Kong service per microservice (points at its upstream)
       loop: "{{ routes | dict2items }}"
       loop_control:
         label: "{{ item.key }}"
@@ -217,7 +279,7 @@
         method: PUT
         body_format: form-urlencoded
         body:
-          url: "http://{{ backend_host }}:{{ item.value.port }}"
+          url: "http://{{ item.key }}-upstream:{{ item.value.port }}"
         status_code: [200, 201]
 
     - name: Create routes per service (one route holding all its prefixes)

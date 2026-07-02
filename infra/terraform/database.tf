@@ -22,6 +22,14 @@ resource "yandex_mdb_postgresql_cluster" "main" {
       disk_type_id       = "network-ssd"
       disk_size          = var.postgres_disk
     }
+
+    # Автобэкапы: явное окно и срок хранения (по умолчанию было бы 7 дней —
+    # фиксируем 7 и ночное окно, чтобы поведение не зависело от дефолтов).
+    backup_retain_period_days = 7
+    backup_window_start {
+      hours   = 1
+      minutes = 0
+    }
   }
 
   host {
