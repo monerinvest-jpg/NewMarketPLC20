@@ -1127,10 +1127,8 @@ class FiscalReceipt(Base):
         except Exception:
             return []
 
-    __table_args__ = (
-        Index("ix_fiscal_receipt_order_id", "order_id"),
-        Index("ix_fiscal_receipt_status", "status"),
-    )
+    # NB: no explicit Index() entries here — order_id/status already carry
+    # column-level index=True; duplicating them broke metadata.create_all.
 
 
 class Transaction(Base):
