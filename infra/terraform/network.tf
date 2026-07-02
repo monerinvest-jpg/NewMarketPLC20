@@ -141,6 +141,13 @@ resource "yandex_vpc_security_group" "bastion" {
     v4_cidr_blocks = local.internal_cidrs
   }
 
+  ingress {
+    description    = "Alertmanager UI — in-VPC only (SSH-туннель для просмотра)"
+    protocol       = "TCP"
+    port           = 9093
+    v4_cidr_blocks = local.internal_cidrs
+  }
+
   egress {
     description    = "Allow all outgoing"
     protocol       = "ANY"

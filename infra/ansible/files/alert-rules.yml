@@ -1,0 +1,83 @@
+# Prometheus alert rules for the marketplace.
+# Shipped by observability.yml to /etc/prometheus/alert-rules.yml on the
+# monitoring host; routed through Alertmanager (Telegram when configured).
+groups:
+  - name: availability
+    rules:
+      - alert: ServiceDown
+        expr: up{job="backend-services"} == 0
+        for: 2m
+        labels: { severity: critical }
+        annotations:
+          summary: "Сервис недоступен: {{ $labels.instance }}"
+          description: "Prometheus не может опросить /metrics инстанса {{ $labels.instance }} уже 2 минуты."
+
+      - alert: KongDown
+        expr: up{job="kong"} == 0
+        for: 2m
+        labels: { severity: critical }
+        annotations:
+          summary: "Kong недоступен: {{ $labels.instance }}"
+          description: "API-шлюз не отвечает — публичный трафик под угрозой."
+
+      - alert: NodeDown
+        expr: up{job="node"} == 0
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "node_exporter молчит: {{ $labels.instance }}"
+          description: "Возможно, нода выключена или недоступна по сети."
+
+  - name: traffic
+    rules:
+      - alert: High5xxRate
+        # >5% ответов 5xx при заметном трафике (>0.2 rps суммарно) 5 минут подряд.
+        expr: |
+          (sum(rate(http_requests_total{status=~"5.."}[5m]))
+             / sum(rate(http_requests_total[5m]))) > 0.05
+          and sum(rate(http_requests_total[5m])) > 0.2
+        for: 5m
+        labels: { severity: critical }
+        annotations:
+          summary: "Ошибки 5xx > 5%"
+          description: "Доля 5xx-ответов за 5 минут превысила 5% — смотри дашборд Marketplace и логи в Loki."
+
+      - alert: HighLatencyP95
+        expr: |
+          histogram_quantile(0.95,
+            sum by (le) (rate(http_request_duration_seconds_bucket[5m]))) > 2
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: "p95 задержки > 2с"
+          description: "95-й перцентиль времени ответа держится выше 2 секунд 10 минут."
+
+  - name: resources
+    rules:
+      - alert: NodeHighMemory
+        expr: |
+          (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) < 0.10
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: "Мало памяти: {{ $labels.instance }}"
+          description: "Доступно менее 10% RAM в течение 10 минут."
+
+      - alert: NodeHighDisk
+        expr: |
+          (node_filesystem_avail_bytes{fstype!~"tmpfs|overlay",mountpoint="/"}
+             / node_filesystem_size_bytes{fstype!~"tmpfs|overlay",mountpoint="/"}) < 0.15
+        for: 15m
+        labels: { severity: warning }
+        annotations:
+          summary: "Мало места на диске: {{ $labels.instance }}"
+          description: "Свободно менее 15% на корневой ФС (докер-логи/образы?)."
+
+      - alert: NodeHighCPU
+        expr: |
+          1 - avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[10m])) > 0.90
+        for: 15m
+        labels: { severity: warning }
+        annotations:
+          summary: "CPU > 90%: {{ $labels.instance }}"
+          description: "Средняя загрузка CPU выше 90% в течение 15 минут."

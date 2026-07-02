@@ -83,6 +83,12 @@
             scrape_interval: 15s
             external_labels:
               monitor: marketplace
+          rule_files:
+            - /etc/prometheus/alert-rules.yml
+          alerting:
+            alertmanagers:
+              - static_configs:
+                  - targets: ['alertmanager:9093']
           scrape_configs:
             - job_name: backend-services
               metrics_path: /metrics
@@ -161,12 +167,35 @@
         dest: "{{ obs_dir }}/loki/loki-config.yml"
         mode: "0644"
 
+    - name: Ship Prometheus alert rules
+      copy:
+        src: files/alert-rules.yml
+        dest: "{{ obs_dir }}/alert-rules.yml"
+        mode: "0644"
+
+    - name: Render Alertmanager config (Telegram when telegram_bot_token is set)
+      template:
+        src: templates/alertmanager.yml.j2
+        dest: "{{ obs_dir }}/alertmanager.yml"
+        mode: "0600"
+
+    - name: Alertmanager container (UI on :9093, in-VPC per the bastion SG)
+      shell: >
+        docker rm -f alertmanager 2>/dev/null || true;
+        docker run -d --name alertmanager --restart always
+        -p 9093:9093
+        -v {{ obs_dir }}/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+        -v alertmanager-data:/alertmanager
+        prom/alertmanager:latest
+      changed_when: false
+
     - name: Prometheus container
       shell: >
         docker rm -f prometheus 2>/dev/null || true;
         docker run -d --name prometheus --restart always
-        -p 9090:9090
+        -p 9090:9090 --link alertmanager:alertmanager
         -v {{ obs_dir }}/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+        -v {{ obs_dir }}/alert-rules.yml:/etc/prometheus/alert-rules.yml:ro
         prom/prometheus:latest
       changed_when: false
 
